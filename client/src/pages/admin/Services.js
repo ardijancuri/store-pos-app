@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { openPdfInNewTab } from '../../utils/pdfUtils';
+import LoadingSpinner from '../../components/LoadingSpinner';
 import {
   Plus,
   Edit,
@@ -448,11 +449,7 @@ const Services = () => {
   };
 
   if (loading && services.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   return (
