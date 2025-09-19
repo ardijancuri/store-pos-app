@@ -25,9 +25,9 @@ export default defineConfig({
     https: false, // Use HTTP for development to avoid SSL issues
     proxy: {
       '/api': {
-        target: 'https://localhost:5000',
+        target: 'http://localhost:5000',
         changeOrigin: true,
-        secure: false, // Allow self-signed certificates
+        secure: false,
         ws: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
@@ -49,23 +49,7 @@ export default defineConfig({
   preview: {
     port: 4173,
     host: '0.0.0.0',
-    https: (() => {
-      try {
-        const certDir = path.join(__dirname, '../server/certs');
-        const keyPath = path.join(certDir, 'key.pem');
-        const certPath = path.join(certDir, 'cert.pem');
-        
-        if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-          return {
-            key: fs.readFileSync(keyPath),
-            cert: fs.readFileSync(certPath),
-          };
-        }
-      } catch (error) {
-        console.log('Using HTTP for preview server');
-      }
-      return false;
-    })(),
+    https: false,
   },
   define: {
     global: 'globalThis',

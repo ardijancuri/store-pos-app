@@ -1,10 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const https = require('https');
-const fs = require('fs');
 const path = require('path');
-const selfsigned = require('selfsigned');
 // const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
@@ -20,45 +17,7 @@ const { run } = require('./database/connection');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Generate self-signed certificates for HTTPS
-const generateCertificates = () => {
-  const certDir = path.join(__dirname, 'certs');
-  const keyPath = path.join(certDir, 'key.pem');
-  const certPath = path.join(certDir, 'cert.pem');
-
-  if (!fs.existsSync(certDir)) {
-    fs.mkdirSync(certDir);
-  }
-
-  if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
-    console.log('🔐 Generating self-signed certificates...');
-
-    // Generate certificates using selfsigned package
-    const attrs = [
-      { name: 'commonName', value: '192.168.100.9' },
-      { name: 'countryName', value: 'US' },
-      { name: 'stateOrProvinceName', value: 'State' },
-      { name: 'localityName', value: 'City' },
-      { name: 'organizationName', value: 'Local Development' }
-    ];
-
-    const pems = selfsigned.generate(attrs, {
-      days: 365,
-      keySize: 2048,
-      algorithm: 'sha256'
-    });
-
-    // Write certificates to files
-    fs.writeFileSync(keyPath, pems.private);
-    fs.writeFileSync(certPath, pems.cert);
-
-    console.log('✅ Certificates generated successfully');
-  }
-
-  return { keyPath, certPath };
-};
-
-const { keyPath, certPath } = generateCertificates();
+// Vercel deployment - no need for certificate generation
 
 // Trust proxy for rate limiting
 // app.set('trust proxy', 1);
@@ -80,7 +39,10 @@ app.use(helmet());
 
 // CORS configuration
 const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? ['https://yourdomain.com']
+  ? [
+      'https://your-frontend-domain.vercel.app',
+      'https://store-pos-frontend.vercel.app'
+    ]
   : [
       'http://localhost:3000',
       'https://localhost:3000',
@@ -139,16 +101,21 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-// Create HTTP server (simplified for development)
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🌐 HTTP Server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🌐 Server accessible at:`);
-  console.log(`   - HTTP: http://localhost:${PORT}`);
-  console.log(`   - HTTP: http://192.168.100.9:${PORT}`);
+// Export app for Vercel
+module.exports = app;
 
-  // Ensure barcode column exists (simple migration)
-  run(`ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode VARCHAR(255) UNIQUE`).catch((e) => {
-    console.error('Failed ensuring barcode column', e.message);
+// Start server only if not in Vercel environment
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 HTTP Server running on port ${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV}`);
+    console.log(`🌐 Server accessible at:`);
+    console.log(`   - HTTP: http://localhost:${PORT}`);
+    console.log(`   - HTTP: http://192.168.100.9:${PORT}`);
+
+    // Ensure barcode column exists (simple migration)
+    run(`ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode VARCHAR(255) UNIQUE`).catch((e) => {
+      console.error('Failed ensuring barcode column', e.message);
+    });
   });
-});
+}

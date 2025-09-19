@@ -23,8 +23,12 @@ export const AuthProvider = ({ children }) => {
     const currentOrigin = window.location.origin;
     let backendUrl = 'http://localhost:5000'; // Default for development (HTTP)
 
+    // Production backend URL
+    if (currentOrigin.includes('vercel.app')) {
+      backendUrl = process.env.REACT_APP_API_URL || 'https://your-backend-domain.vercel.app';
+    }
     // If accessing from network IP, use network backend URL (HTTP)
-    if (currentOrigin.includes('192.168.100.9')) {
+    else if (currentOrigin.includes('192.168.100.9')) {
       backendUrl = 'http://192.168.100.9:5000';
     }
 
