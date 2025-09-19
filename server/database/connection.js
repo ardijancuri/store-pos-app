@@ -1,6 +1,20 @@
 const { Pool } = require('pg');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
+
+// Only load .env file in development
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
+}
+
+// Debug environment variables in production
+if (process.env.NODE_ENV === 'production') {
+  console.log('🔍 Database Environment Variables:');
+  console.log('DB_HOST:', process.env.DB_HOST);
+  console.log('DB_PORT:', process.env.DB_PORT);
+  console.log('DB_NAME:', process.env.DB_NAME);
+  console.log('DB_USER:', process.env.DB_USER);
+  console.log('DB_PASSWORD:', process.env.DB_PASSWORD ? '***SET***' : 'NOT SET');
+}
 
 // PostgreSQL connection configuration
 const pool = new Pool({
