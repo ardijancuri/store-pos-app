@@ -8,12 +8,13 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Debug environment variables in production
 if (process.env.NODE_ENV === 'production') {
-  console.log('🔍 Database Environment Variables:');
-  console.log('DB_HOST:', process.env.DB_HOST);
-  console.log('DB_PORT:', process.env.DB_PORT);
-  console.log('DB_NAME:', process.env.DB_NAME);
-  console.log('DB_USER:', process.env.DB_USER);
-  console.log('DB_PASSWORD:', process.env.DB_PASSWORD ? '***SET***' : 'NOT SET');
+  console.log('Database connection config:', {
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    hasPassword: !!process.env.DB_PASSWORD
+  });
 }
 
 // PostgreSQL connection configuration
