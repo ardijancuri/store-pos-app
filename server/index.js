@@ -40,7 +40,7 @@ app.use(helmet());
 // CORS configuration
 const allowedOrigins = process.env.NODE_ENV === 'production'
   ? [
-      'https://your-frontend-domain.vercel.app',
+      process.env.FRONTEND_URL || 'https://store-pos-frontend.vercel.app',
       'https://store-pos-frontend.vercel.app'
     ]
   : [
