@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { openPdfInNewTab } from '../../utils/pdfUtils';
 import {
   ShoppingCart,
   FileText,
@@ -886,11 +887,15 @@ const Orders = () => {
         yPosition += lineHeight; // Move to next row position
       });
 
-      // Save the PDF
+      // Open PDF in new tab instead of downloading
       const fileName = `orders-report-${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(fileName);
-
-      toast.success('Orders report generated successfully!');
+      const success = openPdfInNewTab(doc, fileName);
+      
+      if (success) {
+        toast.success('Orders report opened in new tab!');
+      } else {
+        toast.error('Failed to open report');
+      }
     } catch (error) {
       console.error('Error generating orders report:', error);
       toast.error('Failed to generate orders report');

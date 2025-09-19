@@ -4,6 +4,7 @@ import { Plus, Trash2, Download } from 'lucide-react';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
+import { openPdfInNewTab } from '../../utils/pdfUtils';
 
 const AdminProducts = () => {
   const [loading, setLoading] = useState(true);
@@ -363,10 +364,15 @@ const AdminProducts = () => {
       y += 5;
       doc.text(`Total Value: ${totalValue.toFixed(2)} MKD`, margin, y);
 
-      // Save the PDF
+      // Open PDF in new tab instead of downloading
       const filename = `products-report-${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(filename);
-      toast.success('Products report generated successfully');
+      const success = openPdfInNewTab(doc, filename);
+      
+      if (success) {
+        toast.success('Products report opened in new tab!');
+      } else {
+        toast.error('Failed to open report');
+      }
 
     } catch (error) {
       console.error('Error generating products report:', error);

@@ -16,6 +16,7 @@ import toast from 'react-hot-toast';
 import JsBarcode from 'jsbarcode';
 import { jsPDF } from 'jspdf';
 import BarcodeScanner from '../../components/BarcodeScanner';
+import { openPdfInNewTab } from '../../utils/pdfUtils';
 
 const Inventory = () => {
   const navigate = useNavigate();
@@ -531,7 +532,11 @@ const Inventory = () => {
         .replace(/[^a-z0-9\-_. ]/gi, '_')
         .slice(0, 60);
       const fileName = `${filenameSafe || 'product'}_${barcodeValue || 'barcode'}.pdf`;
-      doc.save(fileName);
+      const success = openPdfInNewTab(doc, fileName);
+      
+      if (!success) {
+        toast.error('Failed to open PDF');
+      }
     } catch (error) {
       console.error('Failed to create PDF:', error);
       toast.error('Failed to create PDF');
@@ -853,8 +858,13 @@ const Inventory = () => {
       doc.text(`Total Stock MKD: ${stockMkdTotal.toFixed(0)} MKD`, margin, y);
 
       const fileName = `inventory-report-${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(fileName);
-      toast.success('Inventory report generated');
+      const success = openPdfInNewTab(doc, fileName);
+      
+      if (success) {
+        toast.success('Inventory report opened in new tab!');
+      } else {
+        toast.error('Failed to open report');
+      }
     } catch (err) {
       console.error('Error generating inventory report:', err);
       toast.error('Failed to generate inventory report');
@@ -946,8 +956,13 @@ const Inventory = () => {
       });
 
       const fileName = `barcodes-${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(fileName);
-      toast.success('Barcode PDF generated');
+      const success = openPdfInNewTab(doc, fileName);
+      
+      if (success) {
+        toast.success('Barcode PDF opened in new tab!');
+      } else {
+        toast.error('Failed to open barcode PDF');
+      }
     } catch (err) {
       console.error('Error generating barcodes PDF:', err);
       toast.error('Failed to generate barcodes PDF');

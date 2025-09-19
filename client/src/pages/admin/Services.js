@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
+import { openPdfInNewTab } from '../../utils/pdfUtils';
 import {
   Plus,
   Edit,
@@ -154,21 +155,27 @@ const Services = () => {
         responseType: 'blob'
       });
 
-      // Create blob and download
+      // Create blob and open in new tab
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `service-invoice-${serviceId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      
+      // Open in new tab instead of downloading
+      const newWindow = window.open(url, '_blank');
+      if (newWindow) {
+        newWindow.focus();
+        toast.success('Invoice opened in new tab!');
+      } else {
+        toast.error('Failed to open invoice - popup blocked');
+      }
+      
+      // Clean up object URL after a delay
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
 
-      toast.success('Invoice downloaded successfully');
     } catch (error) {
-      console.error('Error downloading invoice:', error);
-      toast.error('Failed to download invoice');
+      console.error('Error opening invoice:', error);
+      toast.error('Failed to open invoice');
     }
   };
 
@@ -379,11 +386,15 @@ const Services = () => {
         yPosition += lineHeight; // Move to next row position
       });
 
-      // Save the PDF
+      // Open PDF in new tab instead of downloading
       const fileName = `services-report-${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(fileName);
+      const success = openPdfInNewTab(doc, fileName);
       
-      toast.success('Services report generated successfully!');
+      if (success) {
+        toast.success('Services report opened in new tab!');
+      } else {
+        toast.error('Failed to open report');
+      }
     } catch (error) {
       console.error('Error generating services report:', error);
       toast.error('Failed to generate services report');
