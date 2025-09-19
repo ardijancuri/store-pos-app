@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
 
     // Production backend URL
     if (currentOrigin.includes('vercel.app')) {
-      backendUrl = process.env.REACT_APP_API_URL || 'https://your-backend-domain.vercel.app';
+      backendUrl = process.env.REACT_APP_API_URL || 'https://store-pos-backend.vercel.app';
     }
     // If accessing from network IP, use network backend URL (HTTP)
     else if (currentOrigin.includes('192.168.100.9')) {
