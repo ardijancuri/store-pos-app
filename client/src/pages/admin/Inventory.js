@@ -31,6 +31,7 @@ const Inventory = () => {
   const [storageSearch, setStorageSearch] = useState('');
   const [priceSearch, setPriceSearch] = useState('');
   const [conditionSearch, setConditionSearch] = useState('');
+  const [batterySearch, setBatterySearch] = useState('');
   const [stockSearch, setStockSearch] = useState('');
   const [createdDateSearch, setCreatedDateSearch] = useState('');
   const [dateSoldSearch, setDateSoldSearch] = useState('');
@@ -102,12 +103,13 @@ const Inventory = () => {
     category: 'smartphones',
     subcategory: '',
     color: '',
-    storage_gb: ''
+    storage_gb: '',
+    battery: ''
   });
 
   useEffect(() => {
     fetchProducts();
-  }, [currentPage, searchTerm, barcodeSearch, descriptionSearch, imeiSearch, activeTab, subcategoryFilter, colorSearch, storageSearch, priceSearch, stockSearch, conditionSearch, createdDateSearch, dateSoldSearch, dateFrom, dateTo]);
+  }, [currentPage, searchTerm, barcodeSearch, descriptionSearch, imeiSearch, activeTab, subcategoryFilter, colorSearch, storageSearch, priceSearch, stockSearch, conditionSearch, batterySearch, createdDateSearch, dateSoldSearch, dateFrom, dateTo]);
 
   // Fetch subcategories from settings
   useEffect(() => {
@@ -253,6 +255,13 @@ const Inventory = () => {
           return m && String(m.condition || '').toLowerCase().includes(q);
         });
       }
+      if (batterySearch.trim()) {
+        const q = batterySearch.trim().toLowerCase();
+        fetched = fetched.filter(p => {
+          if (p.category !== 'smartphones') return false;
+          return String(p.battery || '').toLowerCase().includes(q);
+        });
+      }
       if (createdDateSearch) {
         fetched = fetched.filter(p => {
           if (!p.created_at) return false;
@@ -328,19 +337,25 @@ const Inventory = () => {
       name: computedName,
       price: parseInt(formData.price) || 0,
       stock_quantity: formData.category === 'smartphones' ? 1 : (parseInt(formData.stock_quantity) || 0),
-      subcategory: formData.subcategory || '' // Keep empty string, don't convert to null
+      subcategory: formData.subcategory || '', // Keep empty string, don't convert to null
+      battery: formData.battery && formData.battery !== '' ? parseInt(formData.battery) : null
     };
 
     console.log('Submitting data:', submitData);
+    console.log('Battery value being sent:', formData.battery, 'type:', typeof formData.battery);
 
     try {
       if (editingProduct) {
+        console.log('Sending PUT request to:', `/api/products/${editingProduct.id}`);
+        console.log('Request payload:', submitData);
         await axios.put(`/api/products/${editingProduct.id}`, submitData);
         toast.success('Product updated successfully');
         setShowModal(false);
         setEditingProduct(null);
         resetForm();
       } else {
+        console.log('Sending POST request to:', '/api/products');
+        console.log('Request payload:', submitData);
         await axios.post('/api/products', submitData);
         toast.success('Product created successfully');
         // Track created IMEIs when locking fields for smartphones
@@ -391,7 +406,8 @@ const Inventory = () => {
       model: product.model || '',
       subcategory: product.subcategory || '',
       color: product.color || '',
-      storage_gb: product.storage_gb || ''
+      storage_gb: product.storage_gb || '',
+      battery: product.battery !== null && product.battery !== undefined ? product.battery.toString() : ''
     });
     setShowModal(true);
   };
@@ -428,7 +444,8 @@ const Inventory = () => {
       model: '',
       subcategory: '',
       color: '',
-      storage_gb: ''
+      storage_gb: '',
+      battery: ''
     });
     setEditingProduct(null);
     setEditingImei(null);
@@ -1093,14 +1110,17 @@ const Inventory = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                     Subcategory
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Model
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                     Condition
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                    Battery
                   </th>
                   {activeTab !== 'smartphones' && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1161,6 +1181,15 @@ const Inventory = () => {
                       placeholder="Condition..."
                       value={conditionSearch}
                       onChange={(e) => setConditionSearch(e.target.value)}
+                      className="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </td>
+                  <td className="px-3 py-3">
+                    <input
+                      type="text"
+                      placeholder="Battery..."
+                      value={batterySearch}
+                      onChange={(e) => setBatterySearch(e.target.value)}
                       className="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </td>
@@ -1252,6 +1281,7 @@ const Inventory = () => {
                         setPriceSearch('');
                         setStockSearch('');
                         setConditionSearch('');
+                        setBatterySearch('');
                         setCreatedDateSearch('');
                         setDateSoldSearch('');
                       }}
@@ -1263,7 +1293,7 @@ const Inventory = () => {
                 </tr>
                 {products.map((product) => (
                   <tr key={product.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
                       {product.subcategory ? product.subcategory.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -1273,13 +1303,26 @@ const Inventory = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
                       {product.category === 'smartphones' ? (
                         (() => {
                           const m = smartphoneModels.find(x => x.name === product.model);
                           return m && m.condition ? m.condition : '-';
                         })()
                       ) : '-'}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {product.category === 'smartphones' ? (
+                        product.battery !== null && product.battery !== undefined ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {product.battery}%
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </td>
                     {activeTab !== 'smartphones' && (
                       <td className="px-6 py-4 text-sm text-gray-900">
@@ -1751,6 +1794,24 @@ const Inventory = () => {
                         placeholder="Product IMEI (optional)"
                       />
                     </div>
+
+                    {formData.category === 'smartphones' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Battery (%)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={formData.battery}
+                          onChange={(e) => setFormData({ ...formData, battery: e.target.value })}
+                          className="input"
+                          placeholder="Battery percentage (optional)"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Enter battery percentage (0-100%)</p>
+                      </div>
+                    )}
                   </div>
 
                 </div>

@@ -16,7 +16,8 @@ import {
   Share2,
   Edit,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Printer
 } from 'lucide-react';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import BarcodeScanner from '../../components/BarcodeScanner';
@@ -685,7 +686,412 @@ const Orders = () => {
     }
   };
 
+  const generateWarrantyPDF = async (item) => {
+    try {
+      // Get model information from models API to find warranty
+      const modelsResponse = await axios.get('/api/models');
+      const models = modelsResponse.data || [];
+      
+      // Find the model using helper function
+      const model = findModelForProduct(item.name, models);
+      const warrantyMonths = model?.warranty;
 
+      if (!warrantyMonths || warrantyMonths <= 0) {
+        toast.error('This product does not have warranty coverage');
+        return;
+      }
+
+      // Create PDF using jsPDF
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+
+      // Set document properties
+      doc.setProperties({
+        title: 'Warranty Certificate',
+        subject: 'Product Warranty Information',
+        author: 'POS CRM System',
+        creator: 'POS CRM System'
+      });
+
+      // Add header
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.text('WARRANTY CERTIFICATE', 105, 30, { align: 'center' });
+
+      // Add company info
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text('POS CRM System', 105, 45, { align: 'center' });
+      doc.text('123 Business Street', 105, 52, { align: 'center' });
+      doc.text('City, State 12345', 105, 59, { align: 'center' });
+
+      // Add line separator
+      doc.setLineWidth(0.5);
+      doc.line(20, 70, 190, 70);
+
+      // Product information
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PRODUCT INFORMATION', 20, 85);
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Product Name: ${item.name}`, 20, 100);
+      doc.text(`Purchase Date: ${new Date().toLocaleDateString()}`, 20, 110);
+      doc.text(`Warranty Period: ${warrantyMonths} months`, 20, 120);
+      doc.text(`Warranty Expires: ${new Date(Date.now() + warrantyMonths * 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}`, 20, 130);
+
+      // Customer information
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('CUSTOMER INFORMATION', 20, 150);
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Customer Name: ${guestInfo.name}`, 20, 165);
+      doc.text(`Phone: ${guestInfo.phone}`, 20, 175);
+
+      // Warranty terms
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('WARRANTY TERMS', 20, 195);
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const warrantyText = [
+        'This warranty covers manufacturing defects and hardware failures.',
+        'The warranty does not cover:',
+        '• Physical damage (drops, water damage, etc.)',
+        '• Software issues or user errors',
+        '• Normal wear and tear',
+        '• Unauthorized modifications',
+        '',
+        'To claim warranty service, contact us with this certificate.',
+        'Keep this certificate safe as proof of warranty coverage.'
+      ];
+
+      let yPos = 210;
+      warrantyText.forEach(line => {
+        doc.text(line, 20, yPos);
+        yPos += 5;
+      });
+
+      // Footer
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.text('Generated on: ' + new Date().toLocaleString(), 20, 280);
+      doc.text('Certificate ID: ' + Date.now().toString().slice(-8), 20, 285);
+
+      // Open PDF in new tab
+      const fileName = `warranty-${item.name.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}.pdf`;
+      const success = openPdfInNewTab(doc, fileName);
+      
+      if (success) {
+        toast.success('Warranty certificate opened in new tab!');
+      } else {
+        toast.error('Failed to open warranty certificate');
+      }
+    } catch (error) {
+      console.error('Error generating warranty PDF:', error);
+      toast.error('Failed to generate warranty certificate');
+    }
+  };
+
+  // Helper function to find model for a product
+  const findModelForProduct = (productName, models) => {
+    // Check warranty based on the product name from the order item
+    let model = models.find(m => m.name === productName);
+    
+    // If no exact match, try case-insensitive match
+    if (!model) {
+      model = models.find(m => m.name.toLowerCase() === productName.toLowerCase());
+    }
+    
+    // If still no match, try trimmed match
+    if (!model) {
+      model = models.find(m => 
+        m.name.toLowerCase().trim() === productName.toLowerCase().trim()
+      );
+    }
+    
+    // If still no match, try to find model by base name (remove storage/color details)
+    if (!model) {
+      const baseName = productName
+        .replace(/\s+\d+GB\s*/gi, ' ') // Remove storage like "128GB", "256GB"
+        .replace(/\s+(Black|White|Blue|Red|Green|Yellow|Purple|Pink|Silver|Gold|Space Gray|Space Grey)\s*/gi, ' ') // Remove colors
+        .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+        .trim();
+      
+      model = models.find(m => 
+        m.name.toLowerCase().trim() === baseName.toLowerCase()
+      );
+    }
+    
+    // If still no match, try partial matching (model name is contained in product name)
+    if (!model) {
+      model = models.find(m => 
+        productName.toLowerCase().includes(m.name.toLowerCase())
+      );
+    }
+    
+    return model;
+  };
+
+  // Helper function to load header image
+  const loadHeaderImage = async () => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Set canvas size to match header dimensions with higher resolution
+          canvas.width = 210 * 10; // Ultra-high resolution for best SVG quality
+          canvas.height = 50 * 10; // Increased height for better image display
+          
+          // Enable image smoothing for better quality
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          
+          // Set background to transparent for SVG
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const imgData = canvas.toDataURL('image/png', 1.0); // Maximum quality
+          resolve(imgData);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      img.onerror = () => {
+        reject(new Error('Failed to load image'));
+      };
+      
+      img.src = '/garancia2.svg'; // Path to the SVG image file
+    });
+  };
+
+  // Helper function to render header with text overlay
+  const renderHeader = (doc, warrantyMonths = null) => {
+    const WARRANTY_Y = 32;
+    const MONTHS_Y = 39;
+    
+    // Add text overlay on top of the image
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255); // White text
+    doc.text('WARRANTY', 105, WARRANTY_Y, { align: 'center' });
+    
+    // Add warranty months text
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    const warrantyText = warrantyMonths ? `${warrantyMonths} MONTHS` : '12 MONTHS';
+    doc.text(warrantyText, 105, MONTHS_Y, { align: 'center' });
+    
+    // Reset text color to black for content
+    doc.setTextColor(0, 0, 0);
+  };
+
+  const generateOrderWarrantyPDF = async (order) => {
+    try {
+      // Get order details with items
+      const orderResponse = await axios.get(`/api/orders/${order.id}`);
+      const orderData = orderResponse.data;
+      const orderItems = orderData.items || [];
+
+      if (orderItems.length === 0) {
+        toast.error('No items found in this order');
+        return;
+      }
+
+      // Get model information from models API to find warranty
+      const modelsResponse = await axios.get('/api/models');
+      const models = modelsResponse.data || [];
+
+      // Filter items that have warranty using helper function
+      const itemsWithWarranty = orderItems.filter(item => {
+        const model = findModelForProduct(item.product_name, models);
+        
+        if (!model || !model.warranty || model.warranty <= 0) {
+          return false;
+        }
+        
+        return true;
+      });
+
+      if (itemsWithWarranty.length === 0) {
+        const itemsWithoutWarranty = orderItems.map(item => item.product_name).join(', ');
+        toast.error(`No items in this order have warranty coverage. Items: ${itemsWithoutWarranty}`);
+        return;
+      }
+
+      // Create PDF using jsPDF
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+
+      // Set document properties
+      doc.setProperties({
+        title: 'Order Warranty Certificates',
+        subject: 'Product Warranty Information',
+        author: 'POS CRM System',
+        creator: 'POS CRM System'
+      });
+
+      // Load header image once for all pages
+      let headerImageData = null;
+      try {
+        headerImageData = await loadHeaderImage();
+      } catch (error) {
+        // Image loading failed, will use fallback for all pages
+      }
+
+      // Add header with image background for first page
+      if (headerImageData) {
+        doc.addImage(headerImageData, 'PNG', 0, 0, 210, 50);
+      } else {
+        // Fallback to solid color if image fails to load
+        doc.setFillColor(17, 55, 104); // #113768
+        doc.rect(0, 0, 210, 50, 'F');
+      }
+
+      let yPos = 80;
+      let pageCount = 1;
+
+      // Generate separate warranty certificate page for each item
+      for (let index = 0; index < itemsWithWarranty.length; index++) {
+        const item = itemsWithWarranty[index];
+        
+        // Add new page for each item (except the first one which uses the header page)
+        if (index > 0) {
+          doc.addPage();
+          
+          // Add header for subsequent pages
+          if (headerImageData) {
+            doc.addImage(headerImageData, 'PNG', 0, 0, 210, 50);
+          } else {
+            // Fallback to solid color if image failed to load
+            doc.setFillColor(17, 55, 104); // #113768
+            doc.rect(0, 0, 210, 50, 'F');
+          }
+        }
+
+        // Find the model using helper function
+        const model = findModelForProduct(item.product_name, models);
+        const warrantyMonths = model.warranty;
+
+        // Add header text overlay for this page
+        renderHeader(doc, warrantyMonths);
+
+        // Set content position
+        let yPos = 65; // Start after header
+
+        // Product information section - compact layout
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PRODUCT INFORMATION', 20, yPos);
+        yPos += 8;
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Product Name: ${item.product_name}`, 20, yPos);
+        yPos += 6;
+        doc.text(`Quantity: ${item.quantity}`, 20, yPos);
+        doc.text(`Purchase Date: ${new Date(orderData.created_at).toLocaleDateString()}`, 100, yPos);
+        yPos += 6;
+        doc.text(`Warranty Period: ${warrantyMonths} months`, 20, yPos);
+        doc.text(`Expires: ${new Date(Date.now() + warrantyMonths * 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}`, 100, yPos);
+        yPos += 6;
+        
+        // Add IMEI and Battery information if available
+        if (item.imei) {
+          doc.text(`IMEI: ${item.imei}`, 20, yPos);
+          yPos += 6;
+        }
+        if (item.battery !== null && item.battery !== undefined) {
+          doc.text(`Battery: ${item.battery}%`, 20, yPos);
+          yPos += 6;
+        }
+        
+        yPos += 6;
+
+        // Customer information section - compact layout
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('CUSTOMER INFORMATION', 20, yPos);
+        yPos += 8;
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Customer Name: ${orderData.guest_name || orderData.client_name || 'N/A'}`, 20, yPos);
+        yPos += 6;
+        doc.text(`Phone: ${orderData.guest_phone || orderData.client_phone || 'N/A'}`, 20, yPos);
+        
+        // Add additional customer details if available - compact layout
+        let additionalInfoY = yPos + 6;
+        if (orderData.guest_email) {
+          doc.text(`Email: ${orderData.guest_email}`, 20, additionalInfoY);
+          additionalInfoY += 5;
+        }
+        if (orderData.guest_embg) {
+          doc.text(`EMBG: ${orderData.guest_embg}`, 20, additionalInfoY);
+          additionalInfoY += 5;
+        }
+        if (orderData.guest_id_card) {
+          doc.text(`ID Card: ${orderData.guest_id_card}`, 20, additionalInfoY);
+        }
+        
+        yPos = Math.max(yPos + 12, additionalInfoY + 12);
+
+        // Warranty terms section - compact layout
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('WARRANTY TERMS', 20, yPos);
+        yPos += 8;
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        const warrantyText = [
+          'This warranty covers manufacturing defects and hardware failures.',
+          'The warranty does not cover:',
+          '• Physical damage (drops, water damage, etc.)',
+          '• Software issues or user errors',
+          '• Normal wear and tear',
+          '• Unauthorized modifications',
+          '',
+          'To claim warranty service, contact us with this certificate.',
+          'Keep this certificate safe as proof of warranty coverage.'
+        ];
+
+        warrantyText.forEach(line => {
+          doc.text(line, 20, yPos);
+          yPos += 4;
+        });
+
+        // Footer for each page - compact
+        yPos = 270;
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.text('Generated on: ' + new Date().toLocaleString(), 20, yPos);
+      }
+
+      // Open PDF in new tab
+      const fileName = `order-${orderData.id}-warranty-certificates-${Date.now()}.pdf`;
+      const success = openPdfInNewTab(doc, fileName);
+      
+      if (success) {
+        toast.success(`Warranty certificates for ${itemsWithWarranty.length} item${itemsWithWarranty.length > 1 ? 's' : ''} opened in new tab!`);
+      } else {
+        toast.error('Failed to open warranty certificates');
+      }
+    } catch (error) {
+      console.error('Error generating order warranty PDF:', error);
+      toast.error('Failed to generate warranty certificates');
+    }
+  };
 
   const generateOrdersReport = async () => {
     try {
@@ -1111,6 +1517,13 @@ const Orders = () => {
                             >
                               <Share2 className="h-4 w-4" />
                             </button>
+                            <button
+                              onClick={() => generateOrderWarrantyPDF(order)}
+                              className="text-purple-600 hover:text-purple-900 p-1"
+                              title="Generate Warranty Certificates"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </button>
                           </div>
                           <select
                             value={order.status}
@@ -1221,8 +1634,8 @@ const Orders = () => {
 
       {/* Create Order Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 !mt-0">
-          <div className="relative top-10 mx-auto p-6 border w-11/12 max-w-7xl shadow-lg rounded-md bg-white">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 !mt-0 px-4">
+          <div className="relative top-4 mx-auto p-4 sm:p-6 border w-full max-w-7xl shadow-lg rounded-md bg-white mb-8">
             <div className="mt-3">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Create New Order</h3>
@@ -1236,12 +1649,12 @@ const Orders = () => {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8">
                 {/* Left Column - Customer & Order */}
                 <div className="space-y-4">
                   {/* Guest Information */}
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Guest Name *</label>
                         <input
@@ -1278,9 +1691,9 @@ const Orders = () => {
                       </button>
                       
                       {showMoreGuestInfoCreate && (
-                        <div className="absolute top-full right-0 mt-2 w-96 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-4">
+                        <div className="absolute top-full right-0 mt-2 w-full sm:w-96 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-4">
                           <div className="space-y-3">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                 <label className="block text-sm font-medium text-gray-600 mb-1">EMBG</label>
                                 <input
@@ -1339,10 +1752,10 @@ const Orders = () => {
                   </div>
 
                   {/* Order Status and Discount */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Order Status</label>
-                      <div className="flex space-x-4">
+                      <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0">
                         <label className="flex items-center">
                           <input
                             type="radio"
@@ -1511,9 +1924,9 @@ const Orders = () => {
                             className="flex items-center justify-between p-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
                             onClick={() => addItemToOrder(product)}
                           >
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
                               <div className="h-8 w-8 rounded bg-gray-200 flex-shrink-0" />
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <div className="font-medium text-sm truncate" title={product.name}>{product.name}</div>
                                 <div className="text-xs text-gray-500 truncate" title={product.barcode || ''}>{product.barcode || '—'}</div>
                                 <div className="text-xs text-gray-600">
@@ -1522,7 +1935,7 @@ const Orders = () => {
                               </div>
                             </div>
                             <button
-                              className="btn-secondary text-xs"
+                              className="btn-secondary text-xs flex-shrink-0 ml-2"
                               onClick={(e) => { e.stopPropagation(); addItemToOrder(product); }}
                             >
                               Add

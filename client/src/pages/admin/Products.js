@@ -16,21 +16,29 @@ const AdminProducts = () => {
   const [modelCounts, setModelCounts] = useState({});
   const [availableCounts, setAvailableCounts] = useState({});
   const [modelPriceRanges, setModelPriceRanges] = useState({});
-  const [newModel, setNewModel] = useState({ name: '', price: undefined, storages: [], colors: [], condition: '', subcategory: '', storage_prices: {} });
+  const [newModel, setNewModel] = useState({ name: '', price: undefined, warranty: undefined, storages: [], colors: [], condition: '', subcategory: '', storage_prices: {} });
   const [showStockModal, setShowStockModal] = useState(false);
   const [stockDetails, setStockDetails] = useState({ model: '', items: [] });
   const [modelSearch, setModelSearch] = useState('');
 
+  const fetchModels = async () => {
+    try {
+      const res = await axios.get('/api/models');
+      setModels(res.data || []);
+    } catch (e) {
+      console.error('Failed to fetch models:', e);
+      toast.error('Failed to load models');
+    }
+  };
+
   const fetchSettings = async () => {
     try {
       const res = await axios.get('/api/settings');
-      const sm = Array.isArray(res.data?.smartphone_models) ? res.data.smartphone_models : [];
       const ss = Array.isArray(res.data?.smartphone_subcategories) ? res.data.smartphone_subcategories : [];
-      setModels(sm);
       setSmartphoneSubcategories(ss);
     } catch (e) {
       console.error('Failed to fetch settings:', e);
-      toast.error('Failed to load models');
+      toast.error('Failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -152,6 +160,7 @@ const AdminProducts = () => {
   };
 
   useEffect(() => {
+    fetchModels();
     fetchSettings();
     fetchModelCounts();
     fetchAvailableCounts();
@@ -180,29 +189,33 @@ const AdminProducts = () => {
   const closeAddModelModal = () => {
     setShowAddModelModal(false);
     setEditingModel(null);
-    setNewModel({ name: '', price: undefined, storages: [], colors: [], condition: '', subcategory: '', storage_prices: {} });
+    setNewModel({ name: '', price: undefined, warranty: undefined, storages: [], colors: [], condition: '', subcategory: '', storage_prices: {} });
   };
 
-  const handleDeleteModel = async (modelName) => {
-    const confirmed = window.confirm(`Delete model "${modelName}"? This will not delete existing inventory items.`);
+  const handleDeleteModel = async (modelId) => {
+    const model = models.find(m => m.id === modelId);
+    if (!model) return;
+    
+    const confirmed = window.confirm(`Delete model "${model.name}"? This will not delete existing inventory items.`);
     if (!confirmed) return;
     setSaving(true);
     try {
-      const res = await axios.get('/api/settings');
-      const existing = Array.isArray(res.data?.smartphone_models) ? res.data.smartphone_models : [];
-      const updatedModels = existing.filter(m => m.name !== modelName);
-      await axios.put('/api/settings', { ...res.data, smartphone_models: updatedModels });
+      await axios.delete(`/api/models/${modelId}`);
       toast.success('Model deleted');
       // Refresh all data after model deletion
       await Promise.all([
-        fetchSettings(),
+        fetchModels(),
         fetchModelCounts(),
         fetchAvailableCounts(),
         fetchModelPriceRanges()
       ]);
     } catch (e) {
       console.error('Failed to delete model:', e);
-      toast.error('Failed to delete model');
+      if (e.response?.data?.message) {
+        toast.error(e.response.data.message);
+      } else {
+        toast.error('Failed to delete model');
+      }
     } finally {
       setSaving(false);
     }
@@ -210,9 +223,9 @@ const AdminProducts = () => {
 
   const generateProductsReport = async () => {
     try {
-      // Get all models from settings
-      const settingsRes = await axios.get('/api/settings');
-      const allModels = Array.isArray(settingsRes.data?.smartphone_models) ? settingsRes.data.smartphone_models : [];
+      // Get all models from models API
+      const modelsRes = await axios.get('/api/models');
+      const allModels = modelsRes.data || [];
 
       // Get all products to calculate model statistics
       const params = new URLSearchParams({ limit: 1000, page: 1 });
@@ -400,81 +413,42 @@ const AdminProducts = () => {
     
     setSaving(true);
     try {
-      const res = await axios.get('/api/settings');
-      const existing = Array.isArray(res.data?.smartphone_models) ? res.data.smartphone_models : [];
-      const trimmedName = newModel.name.trim();
-      
-      // Check for duplicate model names (case-insensitive)
+      const modelData = {
+        name: newModel.name.trim(),
+        price: typeof newModel.price === 'number' ? newModel.price : undefined,
+        warranty: typeof newModel.warranty === 'number' ? newModel.warranty : undefined,
+        storages: (newModel.storages || []).filter(s => s && s.trim() !== ''),
+        colors: (newModel.colors || []).filter(c => c && c.trim() !== ''),
+        condition: (newModel.condition || '').trim() || undefined,
+        subcategory: (newModel.subcategory || '').trim() || undefined,
+        storage_prices: newModel.storage_prices || {}
+      };
+
       if (editingModel) {
-        // When editing, check if the new name conflicts with any other model (excluding the current one)
-        const duplicateModel = existing.find(m => 
-          m.name.toLowerCase() === trimmedName.toLowerCase() && 
-          m.name !== editingModel.name
-        );
-        if (duplicateModel) {
-          toast.error(`Model name "${trimmedName}" already exists`);
-          setSaving(false);
-          return;
-        }
+        // Update existing model
+        await axios.put(`/api/models/${editingModel.id}`, modelData);
+        toast.success('Model updated');
       } else {
-        // When adding new, check if the name already exists
-        const duplicateModel = existing.find(m => m.name.toLowerCase() === trimmedName.toLowerCase());
-        if (duplicateModel) {
-          toast.error(`Model name "${trimmedName}" already exists`);
-          setSaving(false);
-          return;
-        }
+        // Create new model
+        await axios.post('/api/models', modelData);
+        toast.success('Model added');
       }
       
-      let updated;
-      if (editingModel) {
-        // update existing model by name
-        updated = {
-          ...res.data,
-          smartphone_models: existing.map(m =>
-            m.name === editingModel.name
-              ? {
-                  name: trimmedName, // Use the trimmed name
-                  price: typeof newModel.price === 'number' ? newModel.price : undefined,
-                  storages: (newModel.storages || []).filter(s => s && s.trim() !== ''),
-                  colors: (newModel.colors || []).filter(c => c && c.trim() !== ''),
-                  condition: (newModel.condition || '').trim() || undefined,
-                  subcategory: (newModel.subcategory || '').trim() || undefined,
-                  storage_prices: newModel.storage_prices || undefined
-                }
-              : m
-          )
-        };
-      } else {
-        updated = {
-          ...res.data,
-          smartphone_models: [
-            ...existing,
-            {
-              name: trimmedName,
-              price: typeof newModel.price === 'number' ? newModel.price : undefined,
-              storages: (newModel.storages || []).filter(s => s && s.trim() !== ''),
-              colors: (newModel.colors || []).filter(c => c && c.trim() !== ''),
-              condition: (newModel.condition || '').trim() || undefined,
-              subcategory: (newModel.subcategory || '').trim() || undefined,
-              storage_prices: newModel.storage_prices || undefined
-            }
-          ]
-        };
-      }
-      await axios.put('/api/settings', updated);
-      toast.success(editingModel ? 'Model updated' : 'Model added');
       closeAddModelModal();
-      // Refresh all data after model update
+      // Refresh all data after model addition/update
       await Promise.all([
-        fetchSettings(),
+        fetchModels(),
         fetchModelCounts(),
         fetchAvailableCounts(),
         fetchModelPriceRanges()
       ]);
     } catch (e) {
-      console.error('Failed to add model:', e);
-      toast.error('Failed to add model');
+      console.error('Failed to save model:', e);
+      if (e.response?.data?.message) {
+        toast.error(e.response.data.message);
+      } else {
+        toast.error('Failed to save model');
+      }
     } finally {
       setSaving(false);
     }
@@ -554,6 +528,7 @@ const AdminProducts = () => {
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Price (MKD)</th>
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Condition</th>
+                  <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Warranty</th>
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Storages</th>
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Colors</th>
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">All Products</th>
@@ -594,6 +569,17 @@ const AdminProducts = () => {
                     <td className="px-2 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-primary-700">{m.name}</td>
                     <td className="px-2 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatPriceDisplay(m.name)}</td>
                     <td className="px-2 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{m.condition ? m.condition : '-'}</td>
+                    <td className="px-2 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {m.warranty ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {m.warranty} months
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                          No warranty
+                        </span>
+                      )}
+                    </td>
                     <td className="px-2 sm:px-4 lg:px-6 py-4 text-sm text-gray-900">
                       <div className="flex flex-wrap gap-1">
                         {(m.storages || []).map((s) => (
@@ -624,6 +610,7 @@ const AdminProducts = () => {
                             setNewModel({
                               name: m.name,
                               price: m.price,
+                              warranty: m.warranty,
                               storages: [...(m.storages || [])],
                               colors: [...(m.colors || [])],
                               condition: m.condition || '',
@@ -641,7 +628,7 @@ const AdminProducts = () => {
                           aria-label="Delete model"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteModel(m.name);
+                            handleDeleteModel(m.id);
                           }}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -729,6 +716,24 @@ const AdminProducts = () => {
                           />
                         </div>
                       </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Warranty (Months) <span className="text-gray-400 text-xs">(Optional)</span></label>
+                        <input
+                          type="number"
+                          className="input w-full"
+                          min="0"
+                          max="60"
+                          value={newModel.warranty ?? ''}
+                          onChange={(e) => setNewModel({ ...newModel, warranty: e.target.value === '' ? undefined : Number(e.target.value) })}
+                          placeholder="e.g., 12 (leave empty for no warranty)"
+                        />
+                    </div>
+                    <div>
+                      {/* Empty div for grid alignment */}
+                    </div>
                   </div>
 
                     <div>

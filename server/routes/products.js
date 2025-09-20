@@ -126,7 +126,7 @@ router.get('/', authenticateToken, requireAdminOrManager, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const isManager = req.user.role === 'manager';
 
-    let selectFields = 'p.id, p.name, p.imei, p.description, p.stock_status, p.stock_quantity, p.created_at, p.barcode, p.category, p.subcategory, p.model, p.color, p.storage_gb, MIN(o.created_at) as date_sold, (ARRAY_AGG(o.id ORDER BY o.created_at ASC))[1] as first_order_id';
+    let selectFields = 'p.id, p.name, p.imei, p.description, p.stock_status, p.stock_quantity, p.created_at, p.barcode, p.category, p.subcategory, p.model, p.color, p.storage_gb, p.battery, MIN(o.created_at) as date_sold, (ARRAY_AGG(o.id ORDER BY o.created_at ASC))[1] as first_order_id';
     if (isAdmin || isManager) {
       selectFields += ', p.price';
     }
@@ -280,7 +280,7 @@ router.get('/barcode/:code', authenticateToken, requireAdminOrManager, async (re
     const isAdmin = req.user.role === 'admin';
     const isManager = req.user.role === 'manager';
 
-    let selectFields = 'id, name, imei, description, stock_status, stock_quantity, created_at, barcode, category, subcategory, model, color, storage_gb';
+    let selectFields = 'id, name, imei, description, stock_status, stock_quantity, created_at, barcode, category, subcategory, model, color, storage_gb, battery';
     if (isAdmin || isManager) {
       selectFields += ', price';
     }
@@ -308,7 +308,7 @@ router.get('/:id', authenticateToken, requireAdminOrManager, async (req, res) =>
     const isAdmin = req.user.role === 'admin';
     const isManager = req.user.role === 'manager';
 
-    let selectFields = 'id, name, imei, description, stock_status, stock_quantity, created_at, barcode, category, subcategory, model, color, storage_gb';
+    let selectFields = 'id, name, imei, description, stock_status, stock_quantity, created_at, barcode, category, subcategory, model, color, storage_gb, battery';
     if (isAdmin || isManager) {
       selectFields += ', price';
     }
@@ -375,18 +375,36 @@ router.post('/', [
       return true;
     }
     throw new Error('Storage must be a string up to 50 characters if provided');
+  }),
+  body('battery').optional().custom((value) => {
+    if (value === '' || value === null || value === undefined) {
+      return true; // Allow empty values
+    }
+    const num = parseInt(value);
+    if (isNaN(num) || num < 0 || num > 100) {
+      throw new Error('Battery must be between 0 and 100 percent');
+    }
+    return true;
   })
 ], async (req, res) => {
   try {
+    console.log('=== CREATE PRODUCT REQUEST ===');
+    console.log('Body:', req.body);
+    console.log('Battery in body:', req.body.battery);
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({ 
         message: 'Validation failed', 
         errors: errors.array() 
       });
     }
 
-    const { name, imei, description, price, stock_status = 'enabled', stock_quantity = 0, barcode, category = 'accessories', subcategory, color, storage_gb, model } = req.body;
+    const { name, imei, description, price, stock_status = 'enabled', stock_quantity = 0, barcode, category = 'accessories', subcategory, color, storage_gb, model, battery } = req.body;
+    
+    // Debug logging
+    console.log('Create product - battery value:', battery, 'type:', typeof battery);
 
     // Fetch allowed subcategories and smartphone models from settings
     const settingsResult = await query('SELECT smartphone_subcategories, accessory_subcategories, smartphone_models FROM settings ORDER BY id LIMIT 1');
@@ -429,13 +447,14 @@ router.post('/', [
     const cleanModel = model === '' ? null : model;
     const cleanStorageGb = storage_gb === '' ? null : storage_gb;
     const cleanPrice = price === '' ? null : price;
+    const cleanBattery = battery === '' || battery === null || battery === undefined ? null : battery;
     // Enforce smartphone stock to be 1
     const enforcedStockQuantity = category === 'smartphones' ? 1 : stock_quantity;
     const cleanStockQuantity = enforcedStockQuantity === '' ? null : enforcedStockQuantity;
 
     const result = await query(
-      'INSERT INTO products (name, imei, description, price, stock_status, stock_quantity, barcode, category, subcategory, model, color, storage_gb) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
-      [name, cleanImei, cleanDescription, cleanPrice, stock_status, cleanStockQuantity, cleanBarcode, category, cleanSubcategory, cleanModel, cleanColor, cleanStorageGb]
+      'INSERT INTO products (name, imei, description, price, stock_status, stock_quantity, barcode, category, subcategory, model, color, storage_gb, battery) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
+      [name, cleanImei, cleanDescription, cleanPrice, stock_status, cleanStockQuantity, cleanBarcode, category, cleanSubcategory, cleanModel, cleanColor, cleanStorageGb, cleanBattery]
     );
 
     res.status(201).json({
@@ -495,11 +514,27 @@ router.put('/:id', [
       return true;
     }
     throw new Error('Storage must be a string up to 50 characters if provided');
+  }),
+  body('battery').optional().custom((value) => {
+    if (value === '' || value === null || value === undefined) {
+      return true; // Allow empty values
+    }
+    const num = parseInt(value);
+    if (isNaN(num) || num < 0 || num > 100) {
+      throw new Error('Battery must be between 0 and 100 percent');
+    }
+    return true;
   })
 ], async (req, res) => {
   try {
+    console.log('=== UPDATE PRODUCT REQUEST ===');
+    console.log('Product ID:', req.params.id);
+    console.log('Body:', req.body);
+    console.log('Battery in body:', req.body.battery);
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({ 
         message: 'Validation failed', 
         errors: errors.array() 
@@ -507,7 +542,10 @@ router.put('/:id', [
     }
 
     const productId = parseInt(req.params.id);
-    const { name, imei, description, price, stock_status, stock_quantity, barcode, category, subcategory, color, storage_gb } = req.body;
+    const { name, imei, description, price, stock_status, stock_quantity, barcode, category, subcategory, color, storage_gb, battery } = req.body;
+    
+    // Debug logging
+    console.log('Update product - battery value:', battery, 'type:', typeof battery);
 
     // Fetch current product to determine effective category if not provided
     const currentResult = await query('SELECT category FROM products WHERE id = $1', [productId]);
@@ -606,15 +644,23 @@ router.put('/:id', [
       paramCount++;
     }
 
+    if (battery !== undefined) {
+      updates.push(`battery = $${paramCount}`);
+      const batteryValue = battery === '' || battery === null || battery === undefined ? null : battery;
+      values.push(batteryValue);
+      console.log('Adding battery to update:', batteryValue, 'paramCount:', paramCount);
+      paramCount++;
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({ message: 'No valid updates provided' });
     }
 
     values.push(productId);
-    const result = await query(
-      `UPDATE products SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
-      values
-    );
+    const sqlQuery = `UPDATE products SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+    console.log('Executing SQL:', sqlQuery);
+    console.log('With values:', values);
+    const result = await query(sqlQuery, values);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Product not found' });

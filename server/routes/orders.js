@@ -184,7 +184,7 @@ router.get('/:id', authenticateToken, requireAdminOrManager, async (req, res) =>
     const itemsResult = await query(`
       SELECT oi.quantity, oi.price,
              p.id as product_id, p.name as product_name, p.description, p.category,
-             p.imei, p.barcode
+             p.imei, p.barcode, p.battery
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
       WHERE oi.order_id = $1

@@ -1,0 +1,330 @@
+warning: in the working copy of 'client/src/pages/admin/Orders.js', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/client/src/pages/admin/Orders.js b/client/src/pages/admin/Orders.js[m
+[1mindex c715fdc..dc02a3a 100644[m
+[1m--- a/client/src/pages/admin/Orders.js[m
+[1m+++ b/client/src/pages/admin/Orders.js[m
+[36m@@ -16,7 +16,8 @@[m [mimport {[m
+   Share2,[m
+   Edit,[m
+   ChevronDown,[m
+[31m-  ChevronUp[m
+[32m+[m[32m  ChevronUp,[m
+[32m+[m[32m  Printer[m
+ } from 'lucide-react';[m
+ import LoadingSpinner from '../../components/LoadingSpinner';[m
+ import BarcodeScanner from '../../components/BarcodeScanner';[m
+[36m@@ -685,7 +686,403 @@[m [mconst Orders = () => {[m
+     }[m
+   };[m
+ [m
+[32m+[m[32m  const generateWarrantyPDF = async (item) => {[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      // Get model information from models API to find warranty[m
+[32m+[m[32m      const modelsResponse = await axios.get('/api/models');[m
+[32m+[m[32m      const models = modelsResponse.data || [];[m
+[32m+[m[41m      [m
+[32m+[m[32m      // Find the model using helper function[m
+[32m+[m[32m      const model = findModelForProduct(item.name, models);[m
+[32m+[m[32m      const warrantyMonths = model?.warranty;[m
+ [m
+[32m+[m[32m      if (!warrantyMonths || warrantyMonths <= 0) {[m
+[32m+[m[32m        toast.error('This product does not have warranty coverage');[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // Create PDF using jsPDF[m
+[32m+[m[32m      const { jsPDF } = await import('jspdf');[m
+[32m+[m[32m      const doc = new jsPDF('p', 'mm', 'a4');[m
+[32m+[m
+[32m+[m[32m      // Set document properties[m
+[32m+[m[32m      doc.setProperties({[m
+[32m+[m[32m        title: 'Warranty Certificate',[m
+[32m+[m[32m        subject: 'Product Warranty Information',[m
+[32m+[m[32m        author: 'POS CRM System',[m
+[32m+[m[32m        creator: 'POS CRM System'[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      // Add header[m
+[32m+[m[32m      doc.setFontSize(20);[m
+[32m+[m[32m      doc.setFont('helvetica', 'bold');[m
+[32m+[m[32m      doc.text('WARRANTY CERTIFICATE', 105, 30, { align: 'center' });[m
+[32m+[m
+[32m+[m[32m      // Add company info[m
+[32m+[m[32m      doc.setFontSize(12);[m
+[32m+[m[32m      doc.setFont('helvetica', 'normal');[m
+[32m+[m[32m      doc.text('POS CRM System', 105, 45, { align: 'center' });[m
+[32m+[m[32m      doc.text('123 Business Street', 105, 52, { align: 'center' });[m
+[32m+[m[32m      doc.text('City, State 12345', 105, 59, { align: 'center' });[m
+[32m+[m
+[32m+[m[32m      // Add line separator[m
+[32m+[m[32m      doc.setLineWidth(0.5);[m
+[32m+[m[32m      doc.line(20, 70, 190, 70);[m
+[32m+[m
+[32m+[m[32m      // Product information[m
+[32m+[m[32m      doc.setFontSize(14);[m
+[32m+[m[32m      doc.setFont('helvetica', 'bold');[m
+[32m+[m[32m      doc.text('PRODUCT INFORMATION', 20, 85);[m
+[32m+[m
+[32m+[m[32m      doc.setFontSize(12);[m
+[32m+[m[32m      doc.setFont('helvetica', 'normal');[m
+[32m+[m[32m      doc.text(`Product Name: ${item.name}`, 20, 100);[m
+[32m+[m[32m      doc.text(`Purchase Date: ${new Date().toLocaleDateString()}`, 20, 110);[m
+[32m+[m[32m      doc.text(`Warranty Period: ${warrantyMonths} months`, 20, 120);[m
+[32m+[m[32m      doc.text(`Warranty Expires: ${new Date(Date.now() + warrantyMonths * 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}`, 20, 130);[m
+[32m+[m
+[32m+[m[32m      // Customer information[m
+[32m+[m[32m      doc.setFontSize(14);[m
+[32m+[m[32m      doc.setFont('helvetica', 'bold');[m
+[32m+[m[32m      doc.text('CUSTOMER INFORMATION', 20, 150);[m
+[32m+[m
+[32m+[m[32m      doc.setFontSize(12);[m
+[32m+[m[32m      doc.setFont('helvetica', 'normal');[m
+[32m+[m[32m      doc.text(`Customer Name: ${guestInfo.name}`, 20, 165);[m
+[32m+[m[32m      doc.text(`Phone: ${guestInfo.phone}`, 20, 175);[m
+[32m+[m
+[32m+[m[32m      // Warranty terms[m
+[32m+[m[32m      doc.setFontSize(14);[m
+[32m+[m[32m      doc.setFont('helvetica', 'bold');[m
+[32m+[m[32m      doc.text('WARRANTY TERMS', 20, 195);[m
+[32m+[m
+[32m+[m[32m      doc.setFontSize(10);[m
+[32m+[m[32m      doc.setFont('helvetica', 'normal');[m
+[32m+[m[32m      const warrantyText = [[m
+[32m+[m[32m        'This warranty covers manufacturing defects and hardware failures.',[m
+[32m+[m[32m        'The warranty does not cover:',[m
+[32m+[m[32m        '• Physical damage (drops, water damage, etc.)',[m
+[32m+[m[32m        '• Software issues or user errors',[m
+[32m+[m[32m        '• Normal wear and tear',[m
+[32m+[m[32m        '• Unauthorized modifications',[m
+[32m+[m[32m        '',[m
+[32m+[m[32m        'To claim warranty service, contact us with this certificate.',[m
+[32m+[m[32m        'Keep this certificate safe as proof of warranty coverage.'[m
+[32m+[m[32m      ];[m
+[32m+[m
+[32m+[m[32m      let yPos = 210;[m
+[32m+[m[32m      warrantyText.forEach(line => {[m
+[32m+[m[32m        doc.text(line, 20, yPos);[m
+[32m+[m[32m        yPos += 5;[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      // Footer[m
+[32m+[m[32m      doc.setFontSize(8);[m
+[32m+[m[32m      doc.setFont('helvetica', 'italic');[m
+[32m+[m[32m      doc.text('Generated on: ' + new Date().toLocaleString(), 20, 280);[m
+[32m+[m[32m      doc.text('Certificate ID: ' + Date.now().toString().slice(-8), 20, 285);[m
+[32m+[m
+[32m+[m[32m      // Open PDF in new tab[m
+[32m+[m[32m      const fileName = `warranty-${item.name.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}.pdf`;[m
+[32m+[m[32m      const success = openPdfInNewTab(doc, fileName);[m
+[32m+[m[41m      [m
+[32m+[m[32m      if (success) {[m
+[32m+[m[32m        toast.success('Warranty certificate opened in new tab!');[m
+[32m+[m[32m      } else {[m
+[32m+[m[32m        toast.error('Failed to open warranty certificate');[m
+[32m+[m[32m      }[m
+[32m+[m[32m    } catch (error) {[m
+[32m+[m[32m      console.error('Error generating warranty PDF:', error);[m
+[32m+[m[32m      toast.error('Failed to generate warranty certificate');[m
+[32m+[m[32m    }[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  // Helper function to find model for a product[m
+[32m+[m[32m  const findModelForProduct = (productName, models) => {[m
+[32m+[m[32m    // Check warranty based on the product name from the order item[m
+[32m+[m[32m    let model = models.find(m => m.name === productName);[m
+[32m+[m[41m    [m
+[32m+[m[32m    // If no exact match, try case-insensitive match[m
+[32m+[m[32m    if (!model) {[m
+[32m+[m[32m      model = models.find(m => m.name.toLowerCase() === productName.toLowerCase());[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    // If still no match, try trimmed match[m
+[32m+[m[32m    if (!model) {[m
+[32m+[m[32m      model = models.find(m =>[m[41m [m
+[32m+[m[32m        m.name.toLowerCase().trim() === productName.toLowerCase().trim()[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    // If still no match, try to find model by base name (remove storage/color details)[m
+[32m+[m[32m    if (!model) {[m
+[32m+[m[32m      const baseName = productName[m
+[32m+[m[32m        .replace(/\s+\d+GB\s*/gi, ' ') // Remove storage like "128GB", "256GB"[m
+[32m+[m[32m        .replace(/\s+(Black|White|Blue|Red|Green|Yellow|Purple|Pink|Silver|Gold|Space Gray|Space Grey)\s*/gi, ' ') // Remove colors[m
+[32m+[m[32m        .replace(/\s+/g, ' ') // Replace multiple spaces with single space[m
+[32m+[m[32m        .trim();[m
+[32m+[m[41m      [m
+[32m+[m[32m      model = models.find(m =>[m[41m [m
+[32m+[m[32m        m.name.toLowerCase().trim() === baseName.toLowerCase()[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    // If still no match, try partial matching (model name is contained in product name)[m
+[32m+[m[32m    if (!model) {[m
+[32m+[m[32m      model = models.find(m =>[m[41m [m
+[32m+[m[32m        productName.toLowerCase().includes(m.name.toLowerCase())[m
+[32m+[m[32m      );[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+[32m+[m[32m    return model;[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  // Helper function to load header image[m
+[32m+[m[32m  const loadHeaderImage = async () => {[m
+[32m+[m[32m    return new Promise((resolve, reject) => {[m
+[32m+[m[32m      const img = new Image();[m
+[32m+[m[32m      img.crossOrigin = 'anonymous';[m
+[32m+[m[41m      [m
+[32m+[m[32m      img.onload = () => {[m
+[32m+[m[32m        try {[m
+[32m+[m[32m          const canvas = document.createElement('canvas');[m
+[32m+[m[32m          const ctx = canvas.getContext('2d');[m
+[32m+[m[41m          [m
+[32m+[m[32m          // Set canvas size to match header dimensions with higher resolution[m
+[32m+[m[32m          canvas.width = 210 * 10; // Ultra-high resolution for best SVG quality[m
+[32m+[m[32m          canvas.height = 50 * 10; // Increased height for better image display[m
+[32m+[m[41m          [m
+[32m+[m[32m          // Enable image smoothing for better quality[m
+[32m+[m[32m          ctx.imageSmoothingEnabled = true;[m
+[32m+[m[32m          ctx.imageSmoothingQuality = 'high';[m
+[32m+[m[41m          [m
+[32m+[m[32m          // Set background to transparent for SVG[m
+[32m+[m[32m          ctx.clearRect(0, 0, canvas.width, canvas.height);[m
+[32m+[m[41m          [m
+[32m+[m[32m          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);[m
+[32m+[m[32m          const imgData = canvas.toDataURL('image/png', 1.0); // Maximum quality[m
+[32m+[m[32m          resolve(imgData);[m
+[32m+[m[32m        } catch (error) {[m
+[32m+[m[32m          reject(error);[m
+[32m+[m[32m        }[m
+[32m+[m[32m      };[m
+[32m+[m[41m      [m
+[32m+[m[32m      img.onerror = () => {[m
+[32m+[m[32m        reject(new Error('Failed to load image'));[m
+[32m+[m[32m      };[m
+[32m+[m[41m      [m
+[32m+[m[32m      img.src = '/garancia2.svg'; // Path to the SVG image file[m
+[32m+[m[32m    });[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  // Helper function to render header with text overlay[m
+[32m+[m[32m  const renderHeader = (doc, warrantyMonths = null) => {[m
+[32m+[m[32m    const WARRANTY_Y = 32;[m
+[32m+[m[32m    const MONTHS_Y = 39;[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Add text overlay on top of the image[m
+[32m+[m[32m    doc.setFontSize(16);[m
+[32m+[m[32m    doc.setFont('helvetica', 'bold');[m
+[32m+[m[32m    doc.setTextColor(255, 255, 255); // White text[m
+[32m+[m[32m    doc.text('WARRANTY', 105, WARRANTY_Y, { align: 'center' });[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Add warranty months text[m
+[32m+[m[32m    doc.setFontSize(12);[m
+[32m+[m[32m    doc.setFont('helvetica', 'normal');[m
+[32m+[m[32m    const warrantyText = warrantyMonths ? `${warrantyMonths} MONTHS` : '12 MONTHS';[m
+[32m+[m[32m    doc.text(warrantyText, 105, MONTHS_Y, { align: 'center' });[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Reset text color to black for content[m
+[32m+[m[32m    doc.setTextColor(0, 0, 0);[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  const generateOrderWarrantyPDF = async (order) => {[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      // Get order details with items[m
+[32m+[m[32m      const orderResponse = await axios.get(`/api/orders/${order.id}`);[m
+[32m+[m[32m      const orderData = orderResponse.data;[m
+[32m+[m[32m      const orderItems = orderData.items || [];[m
+[32m+[m
+[32m+[m[32m      if (orderItems.length === 0) {[m
+[32m+[m[32m        toast.error('No items found in this order');[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // Get model information from models API to find warranty[m
+[32m+[m[32m      const modelsResponse = await axios.get('/api/models');[m
+[32m+[m[32m      const models = modelsResponse.data || [];[m
+[32m+[m
+[32m+[m[32m      // Filter items that have warranty using helper function[m
+[32m+[m[32m      const itemsWithWarranty = orderItems.filter(item => {[m
+[32m+[m[32m        const model = findModelForProduct(item.product_name, models);[m
+[32m+[m[41m        [m
+[32m+[m[32m        if (!model || !model.warranty || model.warranty <= 0) {[m
+[32m+[m[32m          return false;[m
+[32m+[m[32m        }[m
+[32m+[m[41m        [m
+[32m+[m[32m        return true;[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      if (itemsWithWarranty.length === 0) {[m
+[32m+[m[32m        const itemsWithoutWarranty = orderItems.map(item => item.product_name).join(', ');[m
+[32m+[m[32m        toast.error(`No items in this order have warranty coverage. Items: ${itemsWithoutWarranty}`);[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // Create PDF using jsPDF[m
+[32m+[m[32m      const { jsPDF } = await import('jspdf');[m
+[32m+[m[32m      const doc = new jsPDF('p', 'mm', 'a4');[m
+[32m+[m
+[32m+[m[32m      // Set document properties[m
+[32m+[m[32m      doc.setProperties({[m
+[32m+[m[32m        title: 'Order Warranty Certificates',[m
+[32m+[m[32m        subject: 'Product Warranty Information',[m
+[32m+[m[32m        author: 'POS CRM System',[m
+[32m+[m[32m        creator: 'POS CRM System'[m
+[32m+[m[32m      });[m
+[32m+[m
+[32m+[m[32m      // Load header image once for all pages[m
+[32m+[m[32m      let headerImageData = null;[m
+[32m+[m[32m      try {[m
+[32m+[m[32m        headerImageData = await loadHeaderImage();[m
+[32m+[m[32m      } catch (error) {[m
+[32m+[m[32m        // Image loading failed, will use fallback for all pages[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // Add header with image background for first page[m
+[32m+[m[32m      if (headerImageData) {[m
+[32m+[m[32m        doc.addImage(headerImageData, 'PNG', 0, 0, 210, 50);[m
+[32m+[m[32m        renderHeader(doc);[m
+[32m+[m[32m      } else {[m
+[32m+[m[32m        // Fallback to solid color if image fails to load[m
+[32m+[m[32m        doc.setFillColor(17, 55, 104); // #113768[m
+[32m+[m[32m        doc.rect(0, 0, 210, 50, 'F');[m
+[32m+[m[32m        renderHeader(doc);[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      let yPos = 80;[m
+[32m+[m[32m      let pageCount = 1;[m
+[32m+[m
+[32m+[m[32m      // Generate separate warranty certificate page for each item[m
+[32m+[m[32m      for (let index = 0; index < itemsWithWarranty.length; index++) {[m
+[32m+[m[32m        const item = itemsWithWarranty[index];[m
+[32m+[m[41m        [m
+[32m+[m[32m        // Add new page for each item (except the first one which uses the header page)[m
+[32m+[m[32m        if (index > 0) {[m
+[32m+[m[32m          doc.addPage();[m
+[32m+[m[41m          [m
+[32m+[m[32m          // Add header for subsequent pages[m
+[32m+[m[32m          if (headerImageData) {[m
+[32m+[m[32m            doc.addImage(headerImageData, 'PNG', 0, 0, 210, 50);[m
+[32m+[m[32m          } else {[m
+[32m+[m[32m            // Fallback to solid color if image failed to load[m
+[32m+[m[32m            doc.setFillColor(17, 55, 104); // #113768[m
+[32m+[m[32m            doc.rect(0, 0, 210, 50, 'F');[m
+[32m+[m[32m          }[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        // Find the model using helper function[m
+[32m+[m[32m        const model = findModelForProduct(item.product_name, models);[m
+[32m+[m[32m        const warrantyMonths = model.warranty;[m
+[32m+[m
+[32m+[m[32m        // Add header text overlay for this page[m
+[32m+[m[32m        renderHeader(doc, warrantyMonths);[m
+[32m+[m
+[32m+[m[32m        // Set content position[m
+[32m+[m[32m        let yPos = 65; // Start after header[m
+[32m+[m
+[32m+[m[32m        // Product information section - compact layout[m
+[32m+[m[32m        doc.setFontSize(14);[m
+[32m+[m[32m        doc.setFont('helvetica', 'bold');[m
+[32m+[m[32m        doc.text('PRODUCT INFORMATION', 20, yPos);[m
+[32m+[m[32m        yPos += 8;[m
+[32

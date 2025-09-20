@@ -12,6 +12,7 @@ const orderRoutes = require('./routes/orders');
 const shopManagerRoutes = require('./routes/shop-managers');
 const settingsRoutes = require('./routes/settings');
 const serviceRoutes = require('./routes/services');
+const modelRoutes = require('./routes/models');
 const { run } = require('./database/connection');
 
 const app = express();
@@ -80,6 +81,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/shop-managers', shopManagerRoutes);
+app.use('/api/models', modelRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
