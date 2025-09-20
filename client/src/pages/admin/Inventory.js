@@ -111,22 +111,33 @@ const Inventory = () => {
     fetchProducts();
   }, [currentPage, searchTerm, barcodeSearch, descriptionSearch, imeiSearch, activeTab, subcategoryFilter, colorSearch, storageSearch, priceSearch, stockSearch, conditionSearch, batterySearch, createdDateSearch, dateSoldSearch, dateFrom, dateTo]);
 
-  // Fetch subcategories from settings
+  // Fetch subcategories from settings and models from new API
   useEffect(() => {
     const fetchSettings = async () => {
       try {
         const res = await axios.get('/api/settings');
         const ss = Array.isArray(res.data?.smartphone_subcategories) ? res.data.smartphone_subcategories : ['iPhone', 'Samsung', 'Xiaomi'];
         const as = Array.isArray(res.data?.accessory_subcategories) ? res.data.accessory_subcategories : ['telephone', 'smart_watch', 'headphones', 'tablet'];
-        const sm = Array.isArray(res.data?.smartphone_models) ? res.data.smartphone_models : [];
         setSmartphoneSubcategories(ss);
         setAccessorySubcategories(as);
-        setSmartphoneModels(sm);
       } catch (e) {
         // ignore; keep defaults
       }
     };
+
+    const fetchModels = async () => {
+      try {
+        const res = await axios.get('/api/models');
+        const models = Array.isArray(res.data) ? res.data : [];
+        setSmartphoneModels(models);
+      } catch (e) {
+        console.error('Error fetching models:', e);
+        // keep empty array as default
+      }
+    };
+
     fetchSettings();
+    fetchModels();
   }, []);
 
   // Handle ESC key for modals

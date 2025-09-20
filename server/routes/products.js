@@ -62,9 +62,9 @@ router.get('/stats/model-details', [authenticateToken, requireAdmin], async (req
 // Get low stock models for dashboard (admin only)
 router.get('/stats/low-stock-models', [authenticateToken, requireAdmin], async (req, res) => {
   try {
-    // Get all smartphone models from settings
-    const settingsResult = await query('SELECT smartphone_models FROM settings WHERE id = 1');
-    const smartphoneModels = settingsResult.rows[0]?.smartphone_models || [];
+    // Get all smartphone models from models table
+    const modelsResult = await query('SELECT * FROM models ORDER BY name');
+    const smartphoneModels = modelsResult.rows || [];
     
     // Get product counts for existing models
     const productStatsResult = await query(`
@@ -406,12 +406,15 @@ router.post('/', [
     // Debug logging
     console.log('Create product - battery value:', battery, 'type:', typeof battery);
 
-    // Fetch allowed subcategories and smartphone models from settings
-    const settingsResult = await query('SELECT smartphone_subcategories, accessory_subcategories, smartphone_models FROM settings ORDER BY id LIMIT 1');
+    // Fetch allowed subcategories from settings and models from models table
+    const settingsResult = await query('SELECT smartphone_subcategories, accessory_subcategories FROM settings ORDER BY id LIMIT 1');
     const settingsRow = settingsResult.rows[0] || {};
     const smartphoneSubcats = Array.isArray(settingsRow.smartphone_subcategories) ? settingsRow.smartphone_subcategories : [];
-    const smartphoneModels = Array.isArray(settingsRow.smartphone_models) ? settingsRow.smartphone_models : [];
     const accessorySubcats = Array.isArray(settingsRow.accessory_subcategories) ? settingsRow.accessory_subcategories : [];
+    
+    // Fetch models from the new models table
+    const modelsResult = await query('SELECT * FROM models ORDER BY name');
+    const smartphoneModels = modelsResult.rows || [];
 
     // Validate subcategory dynamically if provided
     if (subcategory && subcategory !== '') {
@@ -555,11 +558,15 @@ router.put('/:id', [
     const currentCategory = currentResult.rows[0].category;
     const effectiveCategory = category !== undefined ? category : currentCategory;
 
-    // Fetch allowed subcategories and smartphone models from settings
-    const settingsResult = await query('SELECT smartphone_subcategories, accessory_subcategories, smartphone_models FROM settings ORDER BY id LIMIT 1');
+    // Fetch allowed subcategories from settings and models from models table
+    const settingsResult = await query('SELECT smartphone_subcategories, accessory_subcategories FROM settings ORDER BY id LIMIT 1');
     const settingsRow = settingsResult.rows[0] || {};
     const smartphoneSubcats = Array.isArray(settingsRow.smartphone_subcategories) ? settingsRow.smartphone_subcategories : [];
     const accessorySubcats = Array.isArray(settingsRow.accessory_subcategories) ? settingsRow.accessory_subcategories : [];
+    
+    // Fetch models from the new models table
+    const modelsResult = await query('SELECT * FROM models ORDER BY name');
+    const smartphoneModels = modelsResult.rows || [];
 
     // Validate subcategory dynamically if provided
     if (subcategory !== undefined && subcategory !== null && subcategory !== '') {
