@@ -76,9 +76,9 @@ const AdminProducts = () => {
 
   const fetchModelPriceRanges = async () => {
     try {
-      // Get all models from settings to calculate price ranges including storage prices
-      const settingsRes = await axios.get('/api/settings');
-      const allModels = Array.isArray(settingsRes.data?.smartphone_models) ? settingsRes.data.smartphone_models : [];
+      // Get all models from the new models API to calculate price ranges including storage prices
+      const modelsRes = await axios.get('/api/models');
+      const allModels = Array.isArray(modelsRes.data) ? modelsRes.data : [];
 
       const priceRanges = {};
       
