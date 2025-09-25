@@ -304,10 +304,10 @@ router.post('/', [
   }
 });
 
-// Update order status (admin only)
+// Update order status (admin and manager)
 router.put('/:id/status', [
   authenticateToken,
-  requireAdmin,
+  requireAdminOrManager,
   body('status').isIn(['pending', 'completed'])
 ], async (req, res) => {
   try {
@@ -371,21 +371,11 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
     order.discount_amount = order.discount_amount || 0;
     order.original_total = order.original_total || 0;
     order.total_amount = order.total_amount || 0;
-    
-    console.log('Order data for invoice:', {
-      id: order.id,
-      total_amount: order.total_amount,
-      discount_amount: order.discount_amount,
-      original_total: order.original_total,
-      guest_name: order.guest_name,
-      guest_note: order.guest_note,
-      guest_phone: order.guest_phone
-    });
 
     // Get order items
     const itemsResult = await query(`
       SELECT oi.quantity, oi.price,
-             p.name as product_name, p.description, p.category, p.subcategory, p.model, p.storage_gb, p.color
+             p.name as product_name, p.description, p.category, p.subcategory, p.model, p.storage_gb, p.color, p.imei
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
       WHERE oi.order_id = $1
@@ -394,8 +384,6 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
     if (itemsResult.rows.length === 0) {
       return res.status(400).json({ message: 'Order has no items' });
     }
-    
-    console.log('Order items for invoice:', itemsResult.rows.length, 'items');
     
 
     // Get company settings
@@ -431,7 +419,7 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
 
     // Helper function to draw a line
     const drawLine = (y) => {
-      doc.moveTo(50, y).lineTo(530, y).stroke();
+      doc.moveTo(50, y).lineTo(550, y).stroke();
     };
 
     // Helper function to draw a box
@@ -445,21 +433,13 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
     // Header Section
     doc.fontSize(28).font('Helvetica-Bold').fillColor(black).text('INVOICE', { align: 'center' });
     
-    // Company Logo/Name
-    doc.fontSize(18).font('Helvetica-Bold').fillColor(black).text(settings.company_name, 50, 120);
+    // Bill To Section (moved up under title)
+    doc.fontSize(12).font('Helvetica-Bold').fillColor(black).text('BILL TO:', 50, 100);
     doc.fontSize(10).font('Helvetica').fillColor(black);
-    if (settings.company_address) {
-      doc.text(settings.company_address, 50, 140);
-    }
-    if (settings.company_city_state) {
-      doc.text(settings.company_city_state, 50, 155);
-    }
-    if (settings.company_phone) {
-      doc.text(`Phone: ${settings.company_phone}`, 50, 170);
-    }
-    if (settings.company_email) {
-      doc.text(`Email: ${settings.company_email}`, 50, 185);
-    }
+    
+    doc.text(order.guest_name, 50, 120);
+    if (order.guest_note) doc.text(order.guest_note, 50, 135);
+    if (order.guest_phone) doc.text(order.guest_phone, 50, 150);
 
     // Invoice Details (Right side)
     const invoiceDate = new Date(order.created_at).toLocaleDateString('en-US', {
@@ -468,43 +448,36 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
       day: 'numeric'
     });
     
-    doc.fontSize(12).font('Helvetica-Bold').fillColor(black).text('INVOICE DETAILS', 350, 120);
-    doc.fontSize(10).font('Helvetica').fillColor(black).text(`Invoice #: ${orderId}`, 350, 140);
-    doc.text(`Date: ${invoiceDate}`, 350, 155);
-    doc.text(`Status: ${order.status.toUpperCase()}`, 350, 170);
+    doc.fontSize(12).font('Helvetica-Bold').fillColor(black).text('INVOICE DETAILS', 400, 100);
+    doc.fontSize(10).font('Helvetica').fillColor(black).text(`Invoice #: ${orderId}`, 400, 120);
+    doc.text(`Date: ${invoiceDate}`, 400, 135);
+    doc.text(`Status: ${order.status.toUpperCase()}`, 400, 150);
     
     // Draw line after header
-    drawLine(200);
+    drawLine(170);
     doc.moveDown(1);
 
-    // Bill To Section
-    doc.fontSize(12).font('Helvetica-Bold').fillColor(black).text('BILL TO:', 50, 220);
-    doc.fontSize(10).font('Helvetica').fillColor(black);
-    
-    doc.text(order.guest_name, 50, 240);
-    if (order.guest_note) doc.text(order.guest_note, 50, 255);
-    if (order.guest_phone) doc.text(order.guest_phone, 50, 270);
-
     // Items Table Header
-    const tableY = 300;
-    doc.fontSize(12).font('Helvetica-Bold').fillColor(black);
+    const tableY = 190;
+    doc.fontSize(10).font('Helvetica-Bold').fillColor(black);
     
     // Draw table header box
-    drawBox(50, tableY - 10, 480, 25);
+    drawBox(50, tableY - 10, 500, 25);
     
     // Table headers
-    doc.text('Product', 60, tableY);
-    doc.text('Details', 220, tableY);
+    doc.text('Product', 55, tableY);
+    doc.text('Details', 150, tableY);
+    doc.text('IMEI', 240, tableY);
     doc.text('Qty', 320, tableY);
-    doc.text('Price', 380, tableY);
-    doc.text('Total', 480, tableY);
+    doc.text('Price', 370, tableY);
+    doc.text('Total', 450, tableY);
     
     // Draw line under header
     drawLine(tableY + 15);
 
     // Items - Separated by Currency
     let currentY = tableY + 25;
-    doc.fontSize(10).font('Helvetica').fillColor(black);
+    doc.fontSize(9).font('Helvetica').fillColor(black);
     
     // Separate items by category
     const eurItems = itemsResult.rows.filter(item => item.category === 'smartphones');
@@ -513,7 +486,7 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
     // EUR Products (Smartphones) Section
     if (eurItems.length > 0) {
       // Section header
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#059669'); // Green color for EUR
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#059669'); // Green color for EUR
       doc.text('EUR Products (Smartphones)', 60, currentY);
       currentY += 20;
       
@@ -523,31 +496,35 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
         
         // Alternate row colors (light green for even rows)
         if (index % 2 === 1) {
-          doc.rect(50, currentY - 5, 480, 20).fill('#ecfdf5');
+          doc.rect(50, currentY - 5, 500, 20).fill('#ecfdf5');
         }
         
         // Explicitly set text color to black for each row
         doc.fillColor(black);
         
-        // Set font size to 8 for product details
-        doc.fontSize(10).font('Helvetica');
+        // Set font size to 9 for product details
+        doc.fontSize(9).font('Helvetica');
         
         // For smartphones, show subcategory • model, otherwise just product name
         const displayName = item.subcategory && item.model 
           ? `${item.subcategory} • ${item.model}`
           : item.product_name;
-        doc.text(displayName, 60, currentY);
+        doc.text(displayName, 55, currentY);
         
         // Details column - show storage and color if available
         const details = [];
         if (item.storage_gb) details.push(item.storage_gb);
         if (item.color) details.push(item.color);
         const detailsText = details.length > 0 ? details.join(' • ') : '-';
-        doc.text(detailsText, 220, currentY);
+        doc.text(detailsText, 150, currentY);
+        
+        // IMEI column
+        const imeiText = item.imei || '-';
+        doc.text(imeiText, 240, currentY);
         
         doc.text(item.quantity.toString(), 320, currentY);
-        doc.text(`${price.toFixed(0)} EUR`, 380, currentY);
-        doc.text(`${itemTotal.toFixed(0)} EUR`, 480, currentY);
+        doc.text(`${price.toFixed(0)} EUR`, 370, currentY);
+        doc.text(`${itemTotal.toFixed(0)} EUR`, 450, currentY);
         
         currentY += 20;
       });
@@ -558,7 +535,7 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
     // MKD Products (Accessories) Section
     if (mkdItems.length > 0) {
       // Section header
-      doc.fontSize(10).font('Helvetica-Bold').fillColor('#1d4ed8'); // Blue color for MKD
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#1d4ed8'); // Blue color for MKD
       doc.text('MKD Products (Accessories)', 60, currentY);
       currentY += 20;
       
@@ -568,27 +545,31 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
         
         // Alternate row colors (light blue for even rows)
         if (index % 2 === 1) {
-          doc.rect(50, currentY - 5, 480, 20).fill('#eff6ff');
+          doc.rect(50, currentY - 5, 500, 20).fill('#eff6ff');
         }
         
         // Explicitly set text color to black for each row
         doc.fillColor(black);
         
-        // Set font size to 8 for product details
-        doc.fontSize(10).font('Helvetica');
+        // Set font size to 9 for product details
+        doc.fontSize(9).font('Helvetica');
         
-        doc.text(item.product_name, 60, currentY);
+        doc.text(item.product_name, 55, currentY);
         
         // Details column - show storage and color if available
         const details = [];
         if (item.storage_gb) details.push(item.storage_gb);
         if (item.color) details.push(item.color);
         const detailsText = details.length > 0 ? details.join(' • ') : '-';
-        doc.text(detailsText, 220, currentY);
+        doc.text(detailsText, 150, currentY);
+        
+        // IMEI column
+        const imeiText = item.imei || '-';
+        doc.text(imeiText, 240, currentY);
         
         doc.text(item.quantity.toString(), 320, currentY);
-        doc.text(`${price.toFixed(0)} MKD`, 380, currentY);
-        doc.text(`${itemTotal.toFixed(0)} MKD`, 480, currentY);
+        doc.text(`${price.toFixed(0)} MKD`, 370, currentY);
+        doc.text(`${itemTotal.toFixed(0)} MKD`, 450, currentY);
         
         currentY += 20;
       });

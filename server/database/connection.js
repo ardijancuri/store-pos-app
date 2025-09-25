@@ -8,7 +8,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Debug environment variables in production
 if (process.env.NODE_ENV === 'production') {
-  console.log('Database connection config:', {
+  console.log('Database config:', {
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
     database: process.env.DB_NAME,
@@ -32,7 +32,6 @@ const pool = new Pool({
 
 // Test the connection
 pool.on('connect', () => {
-  console.log('Connected to PostgreSQL database');
 });
 
 pool.on('error', (err) => {

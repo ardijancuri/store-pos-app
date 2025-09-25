@@ -69,10 +69,10 @@ router.get('/:id', authenticateToken, requireAdminOrManager, async (req, res) =>
   }
 });
 
-// Create new model (admin only)
+// Create new model (admin and manager)
 router.post('/', [
   authenticateToken,
-  requireAdmin,
+  requireAdminOrManager,
   body('name').trim().isLength({ min: 1, max: 255 }).withMessage('Model name is required and must be less than 255 characters'),
   body('price').optional().isFloat({ min: 0 }).withMessage('Price must be a positive number'),
   body('warranty').optional().isInt({ min: 0, max: 60 }).withMessage('Warranty must be between 0 and 60 months'),
@@ -124,10 +124,10 @@ router.post('/', [
   }
 });
 
-// Update model (admin only)
+// Update model (admin and manager)
 router.put('/:id', [
   authenticateToken,
-  requireAdmin,
+  requireAdminOrManager,
   body('name').optional().trim().isLength({ min: 1, max: 255 }).withMessage('Model name must be less than 255 characters'),
   body('price').optional().isFloat({ min: 0 }).withMessage('Price must be a positive number'),
   body('warranty').optional().isInt({ min: 0, max: 60 }).withMessage('Warranty must be between 0 and 60 months'),
@@ -228,8 +228,8 @@ router.put('/:id', [
   }
 });
 
-// Delete model (admin only)
-router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+// Delete model (admin and manager)
+router.delete('/:id', authenticateToken, requireAdminOrManager, async (req, res) => {
   try {
     const modelId = parseInt(req.params.id);
 

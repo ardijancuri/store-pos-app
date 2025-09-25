@@ -22,8 +22,8 @@ router.get('/stats/models', [authenticateToken, requireAdminOrManager], async (r
   }
 });
 
-// Model storage/color stock details (admin only)
-router.get('/stats/model-details', [authenticateToken, requireAdmin], async (req, res) => {
+// Model storage/color stock details (admin and manager)
+router.get('/stats/model-details', [authenticateToken, requireAdminOrManager], async (req, res) => {
   try {
     const { model } = req.query;
     if (!model) {
@@ -59,8 +59,8 @@ router.get('/stats/model-details', [authenticateToken, requireAdmin], async (req
   }
 });
 
-// Get low stock models for dashboard (admin only)
-router.get('/stats/low-stock-models', [authenticateToken, requireAdmin], async (req, res) => {
+// Get low stock models for dashboard (admin and manager)
+router.get('/stats/low-stock-models', [authenticateToken, requireAdminOrManager], async (req, res) => {
   try {
     // Get all smartphone models from models table
     const modelsResult = await query('SELECT * FROM models ORDER BY name');
@@ -329,10 +329,10 @@ router.get('/:id', authenticateToken, requireAdminOrManager, async (req, res) =>
   }
 });
 
-// Create product (admin only)
+// Create product (admin and manager)
 router.post('/', [
   authenticateToken,
-  requireAdmin,
+  requireAdminOrManager,
   body('name').trim().isLength({ min: 2, max: 255 }),
   body('imei').optional().trim().custom((value) => {
     if (value === '' || value === null || value === undefined) {
@@ -470,10 +470,10 @@ router.post('/', [
   }
 });
 
-// Update product (admin only)
+// Update product (admin and manager)
 router.put('/:id', [
   authenticateToken,
-  requireAdmin,
+  requireAdminOrManager,
   body('name').optional().trim().isLength({ min: 2, max: 255 }),
   body('imei').optional().trim().custom((value) => {
     if (value === '' || value === null || value === undefined) {
@@ -683,8 +683,8 @@ router.put('/:id', [
   }
 });
 
-// Delete product (admin only)
-router.delete('/:id', [authenticateToken, requireAdmin], async (req, res) => {
+// Delete product (admin and manager)
+router.delete('/:id', [authenticateToken, requireAdminOrManager], async (req, res) => {
   try {
     const productId = parseInt(req.params.id);
 

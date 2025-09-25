@@ -90,7 +90,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Create new service
-router.post('/', authenticateToken, requireAdmin, [
+router.post('/', authenticateToken, requireAdminOrManager, [
   body('full_name').trim().notEmpty().withMessage('Full name is required'),
   body('contact').trim().notEmpty().withMessage('Contact is required'),
   body('phone_model').trim().notEmpty().withMessage('Phone model is required'),
@@ -142,7 +142,7 @@ router.post('/', authenticateToken, requireAdmin, [
 });
 
 // Update service
-router.put('/:id', authenticateToken, requireAdmin, [
+router.put('/:id', authenticateToken, requireAdminOrManager, [
   body('full_name').trim().notEmpty().withMessage('Full name is required'),
   body('contact').trim().notEmpty().withMessage('Contact is required'),
   body('phone_model').trim().notEmpty().withMessage('Phone model is required'),
@@ -199,7 +199,7 @@ router.put('/:id', authenticateToken, requireAdmin, [
 });
 
 // Delete service
-router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, requireAdminOrManager, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await db.query(
@@ -219,7 +219,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
 });
 
 // Generate PDF invoice for service
-router.get('/:id/invoice', authenticateToken, async (req, res) => {
+router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req, res) => {
   try {
     const serviceId = parseInt(req.params.id);
     const isAdmin = req.user.role === 'admin';
@@ -232,8 +232,8 @@ router.get('/:id/invoice', authenticateToken, async (req, res) => {
     `;
     let serviceParams = [serviceId];
 
-    // Non-admin users can only download their own service invoices
-    if (!isAdmin) {
+    // Only restrict access for non-admin, non-manager users (if any exist in the future)
+    if (!isAdmin && req.user.role !== 'manager') {
       serviceQuery += ' AND contact = $2';
       serviceParams.push(req.user.email || req.user.phone);
     }
@@ -285,20 +285,14 @@ router.get('/:id/invoice', authenticateToken, async (req, res) => {
     // Header Section
     doc.fontSize(28).font('Helvetica-Bold').fillColor(black).text('SERVICE INVOICE', { align: 'center' });
     
-    // Company Logo/Name
-    doc.fontSize(18).font('Helvetica-Bold').fillColor(black).text(settings.company_name, 50, 120);
+    // Bill To Section (moved up under title)
+    doc.fontSize(12).font('Helvetica-Bold').fillColor(black).text('BILL TO:', 50, 100);
     doc.fontSize(10).font('Helvetica').fillColor(black);
-    if (settings.company_address) {
-      doc.text(settings.company_address, 50, 140);
-    }
-    if (settings.company_city_state) {
-      doc.text(settings.company_city_state, 50, 155);
-    }
-    if (settings.company_phone) {
-      doc.text(`Phone: ${settings.company_phone}`, 50, 170);
-    }
-    if (settings.company_email) {
-      doc.text(`Email: ${settings.company_email}`, 50, 185);
+    
+    doc.text(service.full_name, 50, 120);
+    doc.text(service.contact, 50, 135);
+    if (service.imei) {
+      doc.text(`IMEI: ${service.imei}`, 50, 150);
     }
 
     // Invoice Details (Right side)
@@ -308,37 +302,27 @@ router.get('/:id/invoice', authenticateToken, async (req, res) => {
       day: 'numeric'
     });
     
-    doc.fontSize(12).font('Helvetica-Bold').fillColor(black).text('INVOICE DETAILS', 350, 120);
-    doc.fontSize(10).font('Helvetica').fillColor(black).text(`Invoice #: ${serviceId}`, 350, 140);
-    doc.text(`Date: ${invoiceDate}`, 350, 155);
-    doc.text(`Status: ${service.status.toUpperCase()}`, 350, 170);
+    doc.fontSize(12).font('Helvetica-Bold').fillColor(black).text('INVOICE DETAILS', 350, 100);
+    doc.fontSize(10).font('Helvetica').fillColor(black).text(`Invoice #: ${serviceId}`, 350, 120);
+    doc.text(`Date: ${invoiceDate}`, 350, 135);
+    doc.text(`Status: ${service.status.toUpperCase()}`, 350, 150);
     
     // Draw line after header
-    drawLine(200);
+    drawLine(170);
     doc.moveDown(1);
 
-    // Bill To Section
-    doc.fontSize(12).font('Helvetica-Bold').fillColor(black).text('BILL TO:', 50, 220);
-    doc.fontSize(10).font('Helvetica').fillColor(black);
-    
-    doc.text(service.full_name, 50, 240);
-    doc.text(service.contact, 50, 255);
-    if (service.imei) {
-      doc.text(`IMEI: ${service.imei}`, 50, 270);
-    }
-
     // Service Details Section
-    doc.fontSize(12).font('Helvetica-Bold').fillColor(black).text('SERVICE DETAILS:', 50, 300);
+    doc.fontSize(12).font('Helvetica-Bold').fillColor(black).text('SERVICE DETAILS:', 50, 190);
     doc.fontSize(10).font('Helvetica').fillColor(black);
     
-    doc.text(`Phone Model: ${service.phone_model}`, 50, 320);
-    doc.text(`Description: ${service.description}`, 50, 335);
+    doc.text(`Phone Model: ${service.phone_model}`, 50, 210);
+    doc.text(`Description: ${service.description}`, 50, 225);
     
     // Draw line after service details
-    drawLine(360);
+    drawLine(250);
 
     // Items Table Header
-    const tableY = 380;
+    const tableY = 270;
     doc.fontSize(12).font('Helvetica-Bold').fillColor(black);
     
     // Draw table header box

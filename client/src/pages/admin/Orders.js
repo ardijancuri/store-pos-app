@@ -23,6 +23,223 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import BarcodeScanner from '../../components/BarcodeScanner';
 import toast from 'react-hot-toast';
 
+// Simplified Cyrillic support using Unicode mode only
+const setupCyrillicSupport = (doc) => {
+  try {
+    console.log('Setting up Cyrillic support...');
+    
+    // Enable Unicode mode
+    if (doc.internal) {
+      doc.internal.unicode = true;
+    }
+    
+    // Use helvetica as the base font
+    doc.setFont('helvetica', 'normal');
+    
+    console.log('Cyrillic support setup complete');
+    return true;
+  } catch (error) {
+    console.error('Failed to setup Cyrillic support:', error);
+    return false;
+  }
+};
+
+// Helper function to convert ArrayBuffer to Base64
+const arrayBufferToBase64 = (buffer) => {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+};
+
+// Helper function to set appropriate font for language
+const setLanguageFont = (doc, language, style = 'normal') => {
+  try {
+    // For all languages, use helvetica with Unicode support
+    if (style === 'bold') {
+      doc.setFont('helvetica', 'bold');
+    } else if (style === 'italic') {
+      doc.setFont('helvetica', 'italic');
+    } else {
+      doc.setFont('helvetica', 'normal');
+    }
+    
+    // Enable Unicode mode for better character support
+    if (doc.internal) {
+      doc.internal.unicode = true;
+    }
+    
+    console.log(`Using helvetica font for ${language} text`);
+  } catch (error) {
+    console.log('Font setting failed, using default helvetica');
+    doc.setFont('helvetica', 'normal');
+  }
+};
+
+// Helper function to render text with better Cyrillic support
+const renderTextWithCyrillicSupport = (doc, text, x, y, options = {}) => {
+  try {
+    // Check if text contains Cyrillic characters
+    const hasCyrillic = /[а-яА-Я]/.test(text);
+    
+    if (hasCyrillic) {
+      console.log('Rendering Cyrillic text:', text.substring(0, 50) + '...');
+      
+      // For Cyrillic text, try to ensure proper encoding
+      if (doc.internal) {
+        doc.internal.unicode = true;
+      }
+      
+      // Split long text into multiple lines if needed
+      if (options.maxWidth && doc.getTextWidth(text) > options.maxWidth) {
+        const lines = doc.splitTextToSize(text, options.maxWidth);
+        lines.forEach((line, index) => {
+          doc.text(line, x, y + (index * (options.lineHeight || 5)), options);
+        });
+        return y + (lines.length * (options.lineHeight || 5));
+      } else {
+        doc.text(text, x, y, options);
+        return y;
+      }
+    } else {
+      // Regular text
+      doc.text(text, x, y, options);
+      return y;
+    }
+  } catch (error) {
+    console.error('Error rendering text:', error);
+    // Fallback to regular text rendering
+    try {
+      doc.text(text.toString(), x, y, options);
+      return y;
+    } catch (fallbackError) {
+      console.error('Fallback text rendering also failed:', fallbackError);
+      return y;
+    }
+  }
+};
+
+// Alternative approach: Use a simpler method for Cyrillic support
+const initializeCyrillicSupport = (doc) => {
+  try {
+    console.log('Initializing Cyrillic support...');
+    
+    // Enable Unicode mode
+    if (doc.internal) {
+      doc.internal.unicode = true;
+      
+      // Try to set better encoding
+      if (doc.internal.encoding !== undefined) {
+        doc.internal.encoding = 'UTF-8';
+      }
+      
+      // Set text rendering mode for better Unicode support
+      if (doc.internal.textState) {
+        doc.internal.textState.renderingMode = 0; // Fill text mode
+      }
+    }
+    
+    console.log('Cyrillic support initialized');
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize Cyrillic support:', error);
+    return false;
+  }
+};
+
+// Warranty text constants for different languages
+const WARRANTY_TEXTS = {
+  albanian: {
+    title: 'GARANCION',
+    months: 'MUAJ',
+    productInfo: 'INFORMACIONI I PRODUKTIT',
+    customerInfo: 'INFORMACIONI I KLIENTIT',
+    warrantyTerms: 'TERMET E GARANCIONIT',
+    // Product information labels
+    productName: 'Emri i Produktit:',
+    quantity: 'Sasia:',
+    purchaseDate: 'Data e Blerjes:',
+    warrantyPeriod: 'Periudha e Garancionit:',
+    expires: 'Data e Skadimit:',
+    imei: 'IMEI:',
+    battery: 'Bateria:',
+    // Customer information labels
+    customerName: 'Emri i Klientit:',
+    phone: 'Telefoni:',
+    email: 'Email:',
+    embg: 'EMBG:',
+    idCard: 'Letërnjoftimi:',
+    terms: [
+      'Best Mobile garanton që produkti brenda periudhës së garancisë në mënyrë korrekte do të funksionojë nëse e përdorni sipas','udhëzimeve të dhëna.',
+      'Best Mobile obligohet që me kërkesën tuaj, derisa vazhdon garancia, në servisin e saj t\'i rregullojë defektet dhe mungesat teknike të','produktit që do të ndodhin gjatë përdorimit normal.',
+      'Best Mobile nuk garanton produktin në rastet e mëposhtme:',
+      '',
+      '• Nëse produkti servisohet nga person i paautorizuar',
+      '• Nëse klienti e trajton pajisjen në mënyrë joprofesionale ose të pakujdesshme',
+      '• Nëse pjesë të papërshtatshme instalohen në pajisje',
+      '• Për baterinë, karikuesin, ekranin',
+      '• Ekrani me flet, vetëm fletin përfshirë pjesët që gjenden në vetë fletin',
+      '• Dëmtimi i shkaktuar gjatë transportit të produktit',
+      '• Dëmtim mekanik',
+      '• Dëmtim për shkak të ndryshimit të energjisë elektrike',
+      '• Bllokim të celularit, kodim me akaunt personal',
+      '',
+      'DEFEKTET E LARTËPËRMENDURA JANË NË LLOGARI TË SHFRYTËZUESIT TË PRODUKTIT',
+      '',
+      'Best Mobile merr përsipër të rregulloj defektin brenda 45 ditëve ose të zëvendësoje pajisjen tuaj me pajisje të përshtatshme, për','telefonat e blerë në Best Mobile dhe ta zgjasë periudhën e garancionit.'
+    ],
+    generatedOn: 'Gjeneruar më:',
+    certificateId: 'ID e Certifikatës:'
+  },
+  macedonian: {
+    title: 'ГАРАНЦИЈА',
+    months: 'МЕСЕЦИ',
+    productInfo: 'ИНФОРМАЦИИ ЗА ПРОИЗВОДОТ',
+    customerInfo: 'ИНФОРМАЦИИ ЗА КЛИЕНТОТ',
+    warrantyTerms: 'УСЛОВИ НА ГАРАНЦИЈА',
+    // Product information labels
+    productName: 'Име на производ:',
+    quantity: 'Количина:',
+    purchaseDate: 'Датум на купување:',
+    warrantyPeriod: 'Гаранциски период:',
+    expires: 'Истекува:',
+    imei: 'IMEI:',
+    battery: 'Батерија:',
+    // Customer information labels
+    customerName: 'Име на клиент:',
+    phone: 'Телефон:',
+    email: 'Е-пошта:',
+    embg: 'ЕМБГ:',
+    idCard: 'Лична карта:',
+    terms: [
+      '"Best Mobile" гарантира дека производот во гарантиот рок правилно ќе функционира, доколку со него ракувате по дадените упатства.',
+      '',
+      '"Best Mobile" се обврзува дека на Ваше барање, додека трае гарантиот рок, ќе ги отстрани во својот сервис дефектите и техничките недостатоци на производот кои би настанале при нормална употреба.',
+      '',
+      '"Best Mobile" не гарантира за производот во следниве случаеви:',
+      '',
+      '• ако купувачот не се придржува кон упатствата за употреба',
+      '• ако производот е сервисиран од неовластено лице',
+      '• ако купувачот нестручно или невнимателно ракува со апаратот',
+      '• ако во апаратот се вградат несоодветни делови',
+      '• за батеријата, полначот, екранот',
+      '• дисплејот со флет, само флет вклучувајќи ги деловите што лежат на самиот флет',
+      '• оштетувања предизвикани при транспорт на производот',
+      '• механичко оштетување',
+      '• оштетување поради варијација на електричната енергија',
+      '• блокирање на мобилниот телефон, кодирање со сопствени акаунт',
+      '',
+      'ГОРЕНАВЕДЕНИТЕ ДЕФЕКТИ СЕ НА СМЕТКА НА КОРИСНИКОТ НА МОБИЛНИОТ АПАРАТ.',
+      '',
+      'Best Mobile се обврзува во рок од 45 дена да го отстрани дефектот или да го замени вашиот апарат со соодветен, за телефоните купени во "Best Mobile" и да го продолжи гарантниот рок.'
+    ],
+    generatedOn: 'Генерирано на:',
+    certificateId: 'ID на сертификат:'
+  }
+};
+
 const Orders = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
@@ -876,27 +1093,35 @@ const Orders = () => {
   };
 
   // Helper function to render header with text overlay
-  const renderHeader = (doc, warrantyMonths = null) => {
+  const renderHeader = (doc, warrantyMonths = null, language = 'albanian') => {
     const WARRANTY_Y = 32;
     const MONTHS_Y = 39;
     
     // Add text overlay on top of the image
     doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
+    setLanguageFont(doc, language, 'bold');
     doc.setTextColor(255, 255, 255); // White text
-    doc.text('WARRANTY', 105, WARRANTY_Y, { align: 'center' });
+    if (language === 'macedonian') {
+      renderTextWithCyrillicSupport(doc, WARRANTY_TEXTS[language].title, 105, WARRANTY_Y, { align: 'center' });
+    } else {
+      doc.text(WARRANTY_TEXTS[language].title, 105, WARRANTY_Y, { align: 'center' });
+    }
     
     // Add warranty months text
     doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    const warrantyText = warrantyMonths ? `${warrantyMonths} MONTHS` : '12 MONTHS';
-    doc.text(warrantyText, 105, MONTHS_Y, { align: 'center' });
+    setLanguageFont(doc, language, 'normal');
+    const warrantyText = warrantyMonths ? `${warrantyMonths} ${WARRANTY_TEXTS[language].months}` : `12 ${WARRANTY_TEXTS[language].months}`;
+    if (language === 'macedonian') {
+      renderTextWithCyrillicSupport(doc, warrantyText, 105, MONTHS_Y, { align: 'center' });
+    } else {
+      doc.text(warrantyText, 105, MONTHS_Y, { align: 'center' });
+    }
     
     // Reset text color to black for content
     doc.setTextColor(0, 0, 0);
   };
 
-  const generateOrderWarrantyPDF = async (order) => {
+  const generateOrderWarrantyPDF = async (order, language = 'albanian') => {
     try {
       // Get order details with items
       const orderResponse = await axios.get(`/api/orders/${order.id}`);
@@ -932,6 +1157,12 @@ const Orders = () => {
       // Create PDF using jsPDF
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
+
+      // Setup Cyrillic support for Macedonian language
+      if (language === 'macedonian') {
+        console.log('Setting up Cyrillic support for Macedonian language');
+        setupCyrillicSupport(doc);
+      }
 
       // Set document properties
       doc.setProperties({
@@ -984,35 +1215,72 @@ const Orders = () => {
         const warrantyMonths = model.warranty;
 
         // Add header text overlay for this page
-        renderHeader(doc, warrantyMonths);
+        renderHeader(doc, warrantyMonths, language);
 
         // Set content position
         let yPos = 65; // Start after header
 
         // Product information section - compact layout
         doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('PRODUCT INFORMATION', 20, yPos);
+        setLanguageFont(doc, language, 'bold');
+        if (language === 'macedonian') {
+          renderTextWithCyrillicSupport(doc, WARRANTY_TEXTS[language].productInfo, 20, yPos);
+        } else {
+          doc.text(WARRANTY_TEXTS[language].productInfo, 20, yPos);
+        }
         yPos += 8;
 
         doc.setFontSize(11);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Product Name: ${item.product_name}`, 20, yPos);
+        setLanguageFont(doc, language, 'normal');
+        const productNameText = `${WARRANTY_TEXTS[language].productName} ${item.product_name}`;
+        if (language === 'macedonian') {
+          renderTextWithCyrillicSupport(doc, productNameText, 20, yPos);
+        } else {
+          doc.text(productNameText, 20, yPos);
+        }
         yPos += 6;
-        doc.text(`Quantity: ${item.quantity}`, 20, yPos);
-        doc.text(`Purchase Date: ${new Date(orderData.created_at).toLocaleDateString()}`, 100, yPos);
+        
+        const quantityText = `${WARRANTY_TEXTS[language].quantity} ${item.quantity}`;
+        const purchaseDateText = `${WARRANTY_TEXTS[language].purchaseDate} ${new Date(orderData.created_at).toLocaleDateString()}`;
+        
+        if (language === 'macedonian') {
+          renderTextWithCyrillicSupport(doc, quantityText, 20, yPos);
+          renderTextWithCyrillicSupport(doc, purchaseDateText, 100, yPos);
+        } else {
+          doc.text(quantityText, 20, yPos);
+          doc.text(purchaseDateText, 100, yPos);
+        }
         yPos += 6;
-        doc.text(`Warranty Period: ${warrantyMonths} months`, 20, yPos);
-        doc.text(`Expires: ${new Date(Date.now() + warrantyMonths * 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}`, 100, yPos);
+        
+        const warrantyPeriodText = `${WARRANTY_TEXTS[language].warrantyPeriod} ${warrantyMonths} ${WARRANTY_TEXTS[language].months}`;
+        const expiresText = `${WARRANTY_TEXTS[language].expires} ${new Date(Date.now() + warrantyMonths * 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}`;
+        
+        if (language === 'macedonian') {
+          renderTextWithCyrillicSupport(doc, warrantyPeriodText, 20, yPos);
+          renderTextWithCyrillicSupport(doc, expiresText, 100, yPos);
+        } else {
+          doc.text(warrantyPeriodText, 20, yPos);
+          doc.text(expiresText, 100, yPos);
+        }
         yPos += 6;
         
         // Add IMEI and Battery information if available
         if (item.imei) {
-          doc.text(`IMEI: ${item.imei}`, 20, yPos);
+          const imeiText = `${WARRANTY_TEXTS[language].imei} ${item.imei}`;
+          if (language === 'macedonian') {
+            renderTextWithCyrillicSupport(doc, imeiText, 20, yPos);
+          } else {
+            doc.text(imeiText, 20, yPos);
+          }
           yPos += 6;
         }
         if (item.battery !== null && item.battery !== undefined) {
-          doc.text(`Battery: ${item.battery}%`, 20, yPos);
+          const batteryText = `${WARRANTY_TEXTS[language].battery} ${item.battery}%`;
+          if (language === 'macedonian') {
+            renderTextWithCyrillicSupport(doc, batteryText, 20, yPos);
+          } else {
+            doc.text(batteryText, 20, yPos);
+          }
           yPos += 6;
         }
         
@@ -1020,70 +1288,65 @@ const Orders = () => {
 
         // Customer information section - compact layout
         doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('CUSTOMER INFORMATION', 20, yPos);
+        setLanguageFont(doc, language, 'bold');
+        doc.text(WARRANTY_TEXTS[language].customerInfo, 20, yPos);
         yPos += 8;
 
         doc.setFontSize(11);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Customer Name: ${orderData.guest_name || orderData.client_name || 'N/A'}`, 20, yPos);
+        setLanguageFont(doc, language, 'normal');
+        doc.text(`${WARRANTY_TEXTS[language].customerName} ${orderData.guest_name || orderData.client_name || 'N/A'}`, 20, yPos);
         yPos += 6;
-        doc.text(`Phone: ${orderData.guest_phone || orderData.client_phone || 'N/A'}`, 20, yPos);
+        doc.text(`${WARRANTY_TEXTS[language].phone} ${orderData.guest_phone || orderData.client_phone || 'N/A'}`, 20, yPos);
         
         // Add additional customer details if available - compact layout
         let additionalInfoY = yPos + 6;
         if (orderData.guest_email) {
-          doc.text(`Email: ${orderData.guest_email}`, 20, additionalInfoY);
+          doc.text(`${WARRANTY_TEXTS[language].email} ${orderData.guest_email}`, 20, additionalInfoY);
           additionalInfoY += 5;
         }
         if (orderData.guest_embg) {
-          doc.text(`EMBG: ${orderData.guest_embg}`, 20, additionalInfoY);
+          doc.text(`${WARRANTY_TEXTS[language].embg} ${orderData.guest_embg}`, 20, additionalInfoY);
           additionalInfoY += 5;
         }
         if (orderData.guest_id_card) {
-          doc.text(`ID Card: ${orderData.guest_id_card}`, 20, additionalInfoY);
+          doc.text(`${WARRANTY_TEXTS[language].idCard} ${orderData.guest_id_card}`, 20, additionalInfoY);
         }
         
         yPos = Math.max(yPos + 12, additionalInfoY + 12);
 
         // Warranty terms section - compact layout
         doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('WARRANTY TERMS', 20, yPos);
+        setLanguageFont(doc, language, 'bold');
+        doc.text(WARRANTY_TEXTS[language].warrantyTerms, 20, yPos);
         yPos += 8;
 
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        const warrantyText = [
-          'This warranty covers manufacturing defects and hardware failures.',
-          'The warranty does not cover:',
-          '• Physical damage (drops, water damage, etc.)',
-          '• Software issues or user errors',
-          '• Normal wear and tear',
-          '• Unauthorized modifications',
-          '',
-          'To claim warranty service, contact us with this certificate.',
-          'Keep this certificate safe as proof of warranty coverage.'
-        ];
+        doc.setFontSize(8);
+        setLanguageFont(doc, language, 'normal');
+        const warrantyText = WARRANTY_TEXTS[language].terms;
 
         warrantyText.forEach(line => {
-          doc.text(line, 20, yPos);
-          yPos += 4;
+          if (language === 'macedonian') {
+            renderTextWithCyrillicSupport(doc, line, 20, yPos, { maxWidth: 170, lineHeight: 3.5 });
+          } else {
+            doc.text(line, 20, yPos);
+          }
+          yPos += 3.5;
         });
 
         // Footer for each page - compact
         yPos = 270;
         doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        doc.text('Generated on: ' + new Date().toLocaleString(), 20, yPos);
+        setLanguageFont(doc, language, 'italic');
+        doc.text(WARRANTY_TEXTS[language].generatedOn + ' ' + new Date().toLocaleString(), 20, yPos);
       }
 
       // Open PDF in new tab
-      const fileName = `order-${orderData.id}-warranty-certificates-${Date.now()}.pdf`;
+      const fileName = `order-${orderData.id}-warranty-certificates-${language}-${Date.now()}.pdf`;
       const success = openPdfInNewTab(doc, fileName);
       
       if (success) {
-        toast.success(`Warranty certificates for ${itemsWithWarranty.length} item${itemsWithWarranty.length > 1 ? 's' : ''} opened in new tab!`);
+        const languageName = language === 'albanian' ? 'Albanian' : 'Macedonian';
+        toast.success(`Warranty certificates (${languageName}) for ${itemsWithWarranty.length} item${itemsWithWarranty.length > 1 ? 's' : ''} opened in new tab!`);
       } else {
         toast.error('Failed to open warranty certificates');
       }
@@ -1518,9 +1781,16 @@ const Orders = () => {
                               <Share2 className="h-4 w-4" />
                             </button>
                             <button
-                              onClick={() => generateOrderWarrantyPDF(order)}
+                              onClick={() => generateOrderWarrantyPDF(order, 'albanian')}
                               className="text-purple-600 hover:text-purple-900 p-1"
-                              title="Generate Warranty Certificates"
+                              title="Generate Warranty Certificates (Albanian)"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => generateOrderWarrantyPDF(order, 'macedonian')}
+                              className="text-indigo-600 hover:text-indigo-900 p-1"
+                              title="Generate Warranty Certificates (Macedonian)"
                             >
                               <Printer className="h-4 w-4" />
                             </button>

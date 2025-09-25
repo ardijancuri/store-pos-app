@@ -179,7 +179,7 @@ const Dashboard = () => {
                           Order #{order.id}
                         </p>
                         <p className="text-sm text-gray-500">
-                          {order.guest_name} • {order.total_amount} EUR
+                          {order.guest_name} • {order.total_amount} MKD
                         </p>
                       </div>
                       <div className="flex-shrink-0">

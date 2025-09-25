@@ -1,6 +1,6 @@
 const express = require('express');
 const { query } = require('../database/connection');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireAdminOrManager } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -24,8 +24,8 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
-// Get all users (admin only) - for dashboard stats
-router.get('/', authenticateToken, requireAdmin, async (req, res) => {
+// Get all users (admin and manager) - for dashboard stats
+router.get('/', authenticateToken, requireAdminOrManager, async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '' } = req.query;
     const offset = (page - 1) * limit;

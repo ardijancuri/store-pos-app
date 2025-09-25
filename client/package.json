@@ -10,9 +10,11 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@react-pdf/font": "^4.0.3",
     "@zxing/library": "^0.21.3",
     "axios": "^1.7.9",
     "clsx": "^2.1.1",
+    "html2canvas": "^1.4.1",
     "jsbarcode": "^3.11.6",
     "jspdf": "^3.0.2",
     "lucide-react": "^0.469.0",

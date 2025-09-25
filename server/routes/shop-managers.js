@@ -39,7 +39,7 @@ router.get('/', authenticateToken, requireAdminOrManager, async (req, res) => {
 // Create shop manager
 router.post('/', [
   authenticateToken,
-  requireAdmin,
+  requireAdminOrManager,
   body('name').trim().isLength({ min: 1, max: 255 }),
   body('phone').optional({ nullable: true }).isLength({ max: 50 })
 ], async (req, res) => {
@@ -63,7 +63,7 @@ router.post('/', [
 // Update shop manager
 router.put('/:id', [
   authenticateToken,
-  requireAdmin,
+  requireAdminOrManager,
   body('name').optional().trim().isLength({ min: 1, max: 255 }),
   body('phone').optional({ nullable: true }).isLength({ max: 50 }),
   body('is_active').optional().isBoolean()
@@ -93,7 +93,7 @@ router.put('/:id', [
 });
 
 // Delete shop manager
-router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, requireAdminOrManager, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     // Prevent delete if referenced by orders

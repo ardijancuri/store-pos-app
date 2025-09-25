@@ -108,11 +108,6 @@ module.exports = app;
 // Start server only if not in Vercel environment
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP Server running on port ${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-    console.log(`🌐 Server accessible at:`);
-    console.log(`   - HTTP: http://localhost:${PORT}`);
-    console.log(`   - HTTP: http://192.168.100.9:${PORT}`);
 
     // Ensure barcode column exists (simple migration)
     run(`ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode VARCHAR(255) UNIQUE`).catch((e) => {

@@ -1102,8 +1102,13 @@ const Inventory = () => {
           </button>
           <button
             onClick={async () => { await generateBarcodesReport(); }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
-            title="Generate barcodes PDF (one per page) for selected date range"
+            disabled={!dateFrom || !dateTo}
+            className={`px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors w-full sm:w-auto ${
+              !dateFrom || !dateTo
+                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+            title={!dateFrom || !dateTo ? "Please select both date filters to generate barcodes" : "Generate barcodes PDF (one per page) for selected date range"}
           >
             <Download className="h-4 w-4" />
             Barcode

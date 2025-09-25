@@ -3,7 +3,6 @@ const bcrypt = require('bcryptjs');
 
 async function setupDatabase() {
   try {
-    console.log('🚀 Setting up PostgreSQL database for Store-POS...');
 
     // Create admin users table (no client role in Store-POS)
     await run(`
@@ -96,9 +95,7 @@ async function setupDatabase() {
         ALTER TABLE products
         DROP COLUMN IF EXISTS image
       `);
-      console.log('✅ Removed image column');
     } catch (error) {
-      console.log('ℹ️  Image column already removed or never existed');
     }
 
     // Create shop_managers table
@@ -282,10 +279,8 @@ async function setupDatabase() {
         await run(`CREATE INDEX IF NOT EXISTS idx_products_imei_trgm ON products USING gin (imei gin_trgm_ops)`);
         await run(`CREATE INDEX IF NOT EXISTS idx_products_color_trgm ON products USING gin (color gin_trgm_ops)`);
       } catch (e) {
-        console.log('ℹ️  Skipping pg_trgm indexes (extension not available):', e.message);
       }
     } catch (e) {
-      console.log('ℹ️  Index creation skipped or already exists:', e.message);
     }
 
     // Insert default settings if table is empty
@@ -305,7 +300,6 @@ async function setupDatabase() {
       `);
     }
 
-    console.log('✅ Database tables created successfully');
 
     // Check if admin user already exists
     const adminExists = await get('SELECT id FROM users WHERE email = $1', ['admin@storepos.com']);
@@ -317,9 +311,7 @@ async function setupDatabase() {
         'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
         ['Store Admin', 'admin@storepos.com', adminPasswordHash, 'admin']
       );
-      console.log('✅ Admin user created: admin@storepos.com / Admin@2024Secure!');
     } else {
-      console.log('ℹ️  Admin user already exists');
     }
 
     // Update role constraint to allow manager role
@@ -342,9 +334,7 @@ async function setupDatabase() {
         'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
         ['Store Manager', 'manager@storepos.com', managerPasswordHash, 'manager']
       );
-      console.log('✅ Manager user created: manager@storepos.com / Manager@2024!');
     } else {
-      console.log('ℹ️  Manager user already exists');
     }
 
     // No client seeding for Store-POS
@@ -435,9 +425,7 @@ async function setupDatabase() {
           [product.name, product.description, product.price, product.stock_quantity, product.stock_status, product.category, product.subcategory]
         );
       }
-      console.log('✅ Sample products created with categories');
     } else {
-      console.log('ℹ️  Sample products already exist');
     }
 
     // Check if sample services exist
@@ -484,9 +472,7 @@ async function setupDatabase() {
           [service.full_name, service.contact, service.phone_model, service.imei, service.description, service.price, service.status, service.profit]
         );
       }
-      console.log('✅ Sample services created');
     } else {
-      console.log('ℹ️  Sample services already exist');
     }
 
     // Backfill: regenerate smartphone product names to include subcategory + model + storage + color
@@ -496,18 +482,9 @@ async function setupDatabase() {
         SET name = TRIM(BOTH ' ' FROM CONCAT_WS(' ', subcategory, model, storage_gb, color))
         WHERE category = 'smartphones'
       `);
-      console.log('✅ Regenerated smartphone product names to include subcategory');
     } catch (e) {
-      console.log('ℹ️  Skipped smartphone name backfill:', e.message);
     }
 
-    console.log('🎉 Store-POS database setup completed successfully!');
-    console.log('\n📋 Default Accounts:');
-    console.log('   Admin Email: admin@storepos.com');
-    console.log('   Admin Password: Admin@2024Secure!');
-    console.log('   Manager Email: manager@storepos.com');
-    console.log('   Manager Password: Manager@2024!');
-    console.log('\n🔗 You can now start the application with: npm run dev');
 
   } catch (error) {
     console.error('❌ Error setting up database:', error);

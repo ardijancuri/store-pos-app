@@ -21,10 +21,10 @@ router.get('/', authenticateToken, requireAdminOrManager, async (req, res) => {
   }
 });
 
-// Update settings (admin only)
+// Update settings (admin and manager)
 router.put('/', [
   authenticateToken,
-  requireAdmin,
+  requireAdminOrManager,
   body('company_name').trim().isLength({ min: 1, max: 255 }).withMessage('Company name is required and must be less than 255 characters'),
   body('company_address').optional().trim(),
   body('company_city_state').optional().trim().isLength({ max: 255 }).withMessage('City/State must be less than 255 characters'),
