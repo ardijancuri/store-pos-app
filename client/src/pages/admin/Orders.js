@@ -618,9 +618,6 @@ const Orders = () => {
         guestIdCard: editGuestInfo.idCard.trim() || ''
       };
 
-      console.log('Sending order update data:', orderData);
-      console.log('Edit selected items:', editSelectedItems);
-
       await axios.put(`/api/orders/${editingOrder.id}`, orderData);
       toast.success('Order updated successfully');
       closeEditModal();
@@ -681,13 +678,9 @@ const Orders = () => {
 
   const downloadInvoice = async (orderId) => {
     try {
-      console.log('Downloading invoice for order:', orderId);
-
       const response = await axios.get(`/api/orders/${orderId}/invoice`, {
         responseType: 'blob'
       });
-
-      console.log('Invoice response received:', response);
 
       if (response.data.size === 0) {
         toast.error('Invoice is empty or corrupted');
@@ -732,8 +725,6 @@ const Orders = () => {
 
   const shareInvoiceWhatsApp = async (orderId) => {
     try {
-      console.log('Sharing invoice for order:', orderId);
-
       // First download the file so user can attach it
       const response = await axios.get(`/api/orders/${orderId}/invoice`, {
         responseType: 'blob'
@@ -760,7 +751,6 @@ const Orders = () => {
           return;
         }
       } catch (shareErr) {
-        console.log('Native share failed, falling back to download:', shareErr);
         // Native share failed, fall back to download + WhatsApp
       }
 
@@ -855,8 +845,6 @@ const Orders = () => {
   };
 
   const handleBarcodeScanned = async (code) => {
-    console.log('Detected code:', code);
-
     try {
       // Search for product by barcode
       const response = await axios.get(`/api/products/barcode/${encodeURIComponent(code)}`);

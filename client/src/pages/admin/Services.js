@@ -105,7 +105,6 @@ const Services = () => {
     
     try {
       const token = localStorage.getItem('token');
-      console.log('Submitting service data:', formData);
       
       if (editingService) {
         await axios.put(`/api/services/${editingService.id}`, formData, {
@@ -125,7 +124,6 @@ const Services = () => {
     } catch (error) {
       console.error('Error saving service:', error);
       if (error.response?.data?.errors) {
-        console.log('Validation errors:', error.response.data.errors);
         toast.error('Validation error: ' + error.response.data.errors[0].msg);
       } else {
         toast.error(error.response?.data?.error || 'Failed to save service');

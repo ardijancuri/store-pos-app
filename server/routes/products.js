@@ -388,13 +388,8 @@ router.post('/', [
   })
 ], async (req, res) => {
   try {
-    console.log('=== CREATE PRODUCT REQUEST ===');
-    console.log('Body:', req.body);
-    console.log('Battery in body:', req.body.battery);
-    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('Validation errors:', errors.array());
       return res.status(400).json({ 
         message: 'Validation failed', 
         errors: errors.array() 
@@ -402,9 +397,6 @@ router.post('/', [
     }
 
     const { name, imei, description, price, stock_status = 'enabled', stock_quantity = 0, barcode, category = 'accessories', subcategory, color, storage_gb, model, battery } = req.body;
-    
-    // Debug logging
-    console.log('Create product - battery value:', battery, 'type:', typeof battery);
 
     // Fetch allowed subcategories from settings and models from models table
     const settingsResult = await query('SELECT smartphone_subcategories, accessory_subcategories FROM settings ORDER BY id LIMIT 1');
@@ -530,14 +522,8 @@ router.put('/:id', [
   })
 ], async (req, res) => {
   try {
-    console.log('=== UPDATE PRODUCT REQUEST ===');
-    console.log('Product ID:', req.params.id);
-    console.log('Body:', req.body);
-    console.log('Battery in body:', req.body.battery);
-    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('Validation errors:', errors.array());
       return res.status(400).json({ 
         message: 'Validation failed', 
         errors: errors.array() 
@@ -546,9 +532,6 @@ router.put('/:id', [
 
     const productId = parseInt(req.params.id);
     const { name, imei, description, price, stock_status, stock_quantity, barcode, category, subcategory, color, storage_gb, battery } = req.body;
-    
-    // Debug logging
-    console.log('Update product - battery value:', battery, 'type:', typeof battery);
 
     // Fetch current product to determine effective category if not provided
     const currentResult = await query('SELECT category FROM products WHERE id = $1', [productId]);
@@ -655,7 +638,6 @@ router.put('/:id', [
       updates.push(`battery = $${paramCount}`);
       const batteryValue = battery === '' || battery === null || battery === undefined ? null : battery;
       values.push(batteryValue);
-      console.log('Adding battery to update:', batteryValue, 'paramCount:', paramCount);
       paramCount++;
     }
 
@@ -665,8 +647,6 @@ router.put('/:id', [
 
     values.push(productId);
     const sqlQuery = `UPDATE products SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`;
-    console.log('Executing SQL:', sqlQuery);
-    console.log('With values:', values);
     const result = await query(sqlQuery, values);
 
     if (result.rows.length === 0) {

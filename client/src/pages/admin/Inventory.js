@@ -352,21 +352,14 @@ const Inventory = () => {
       battery: formData.battery && formData.battery !== '' ? parseInt(formData.battery) : null
     };
 
-    console.log('Submitting data:', submitData);
-    console.log('Battery value being sent:', formData.battery, 'type:', typeof formData.battery);
-
     try {
       if (editingProduct) {
-        console.log('Sending PUT request to:', `/api/products/${editingProduct.id}`);
-        console.log('Request payload:', submitData);
         await axios.put(`/api/products/${editingProduct.id}`, submitData);
         toast.success('Product updated successfully');
         setShowModal(false);
         setEditingProduct(null);
         resetForm();
       } else {
-        console.log('Sending POST request to:', '/api/products');
-        console.log('Request payload:', submitData);
         await axios.post('/api/products', submitData);
         toast.success('Product created successfully');
         // Track created IMEIs when locking fields for smartphones
@@ -706,8 +699,6 @@ const Inventory = () => {
   };
 
   const handleBarcodeScanned = (code) => {
-    console.log('Detected code:', code);
-
     // Update form with detected barcode
     setNewProduct(prev => ({
       ...prev,
