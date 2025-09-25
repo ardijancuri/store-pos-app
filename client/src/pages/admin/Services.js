@@ -3,6 +3,7 @@ import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { openPdfInNewTab } from '../../utils/pdfUtils';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   Plus,
   Edit,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 
 const Services = () => {
+  const { user } = useAuth();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -226,7 +228,7 @@ const Services = () => {
 
       // Calculate totals first
       const totalPrice = allServices.reduce((sum, service) => sum + (parseFloat(service.price) || 0), 0);
-      const totalProfit = allServices.reduce((sum, service) => sum + (parseFloat(service.profit) || 0), 0);
+      const totalProfit = user?.role === 'admin' ? allServices.reduce((sum, service) => sum + (parseFloat(service.profit) || 0), 0) : 0;
       
       // Add header
       doc.setFontSize(20);
@@ -271,11 +273,15 @@ const Services = () => {
         
         // Move totals down one line
         doc.text(`Total Price: ${totalPrice.toFixed(0)} MKD`, 20, 51);
-        doc.text(`Total Profit: ${totalProfit.toFixed(0)} MKD`, 20, 58);
+        if (user?.role === 'admin') {
+          doc.text(`Total Profit: ${totalProfit.toFixed(0)} MKD`, 20, 58);
+        }
       } else {
         // No date filter - show totals at original position
         doc.text(`Total Price: ${totalPrice.toFixed(0)} MKD`, 20, 44);
-        doc.text(`Total Profit: ${totalProfit.toFixed(0)} MKD`, 20, 51);
+        if (user?.role === 'admin') {
+          doc.text(`Total Profit: ${totalProfit.toFixed(0)} MKD`, 20, 51);
+        }
       }
 
       // Start services table
@@ -292,7 +298,7 @@ const Services = () => {
       const colPhoneModel = tableStartX + 70;
       const colStatus = tableStartX + 120;
       const colPrice = tableStartX + 150;
-      const colProfit = tableStartX + 170;
+      const colProfit = user?.role === 'admin' ? tableStartX + 170 : null;
       
       // Table headers with gray background and border
       doc.setFontSize(9); // Slightly smaller for more compact look
@@ -309,7 +315,9 @@ const Services = () => {
       doc.text('Phone Model', colPhoneModel, yPosition);
       doc.text('Status', colStatus, yPosition);
       doc.text('Price', colPrice + 15, yPosition, { align: 'right' });
-      doc.text('Profit', colProfit + 15, yPosition, { align: 'right' });
+      if (user?.role === 'admin') {
+        doc.text('Profit', colProfit + 15, yPosition, { align: 'right' });
+      }
       
       yPosition += lineHeight + 1; // Reduced spacing
       
@@ -339,7 +347,9 @@ const Services = () => {
           doc.text('Phone Model', colPhoneModel, yPosition);
           doc.text('Status', colStatus, yPosition);
           doc.text('Price', colPrice + 15, yPosition, { align: 'right' });
-          doc.text('Profit', colProfit + 15, yPosition, { align: 'right' });
+          if (user?.role === 'admin') {
+            doc.text('Profit', colProfit + 15, yPosition, { align: 'right' });
+          }
           
           yPosition += lineHeight + 1;
           doc.line(tableStartX, yPosition, tableStartX + tableWidth, yPosition);
@@ -374,7 +384,9 @@ const Services = () => {
         const profit = parseFloat(service.profit) || 0;
         
         doc.text(price > 0 ? price.toFixed(0) : '-', colPrice + 15, yPosition, { align: 'right' });
-        doc.text(profit > 0 ? profit.toFixed(0) : '-', colProfit + 15, yPosition, { align: 'right' });
+        if (user?.role === 'admin') {
+          doc.text(profit > 0 ? profit.toFixed(0) : '-', colProfit + 15, yPosition, { align: 'right' });
+        }
         
         // Add row separator after every row (positioned lower)
         if (index < allServices.length - 1) {
@@ -461,36 +473,40 @@ const Services = () => {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-          {/* Date Range Selector */}
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0" />
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="input text-sm w-36"
-              placeholder="From"
-            />
-            <span className="text-gray-500">to</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="input text-sm w-36"
-              placeholder="To"
-            />
-          </div>
+          {/* Date Range Selector - Admin only */}
+          {user?.role === 'admin' && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0" />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="input text-sm w-36"
+                placeholder="From"
+              />
+              <span className="text-gray-500">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="input text-sm w-36"
+                placeholder="To"
+              />
+            </div>
+          )}
           
-          {/* Generate Report Button */}
-          <button
-            onClick={generateServicesReport}
-            className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
-            title="Generate PDF report of services in selected date range"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Generate Report</span>
-            <span className="sm:hidden">Generate</span>
-          </button>
+          {/* Generate Report Button - Admin only */}
+          {user?.role === 'admin' && (
+            <button
+              onClick={generateServicesReport}
+              className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
+              title="Generate PDF report of services in selected date range"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Generate Report</span>
+              <span className="sm:hidden">Generate</span>
+            </button>
+          )}
           
           {/* Add Service Button */}
           <button
@@ -582,9 +598,11 @@ const Services = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Profit
-                  </th>
+                  {user?.role === 'admin' && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Profit
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Created
                   </th>
@@ -632,15 +650,17 @@ const Services = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(service.status)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {service.profit ? (
-                        <span className="text-sm font-medium text-green-600">
-                          {parseFloat(service.profit).toFixed(0)} MKD
-                        </span>
-                      ) : (
-                        <span className="text-sm text-gray-500">-</span>
-                      )}
-                    </td>
+                    {user?.role === 'admin' && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {service.profit ? (
+                          <span className="text-sm font-medium text-green-600">
+                            {parseFloat(service.profit).toFixed(0)} MKD
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-500">-</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <Calendar className="h-4 w-4 text-gray-400 mr-2" />
@@ -851,20 +871,22 @@ const Services = () => {
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Profit (MKD) (Optional)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formData.profit}
-                        onChange={(e) => setFormData({ ...formData, profit: e.target.value })}
-                        className="input w-full"
-                        placeholder="Leave empty if not calculated yet"
-                      />
-                    </div>
+                    {user?.role === 'admin' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Profit (MKD) (Optional)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.profit}
+                          onChange={(e) => setFormData({ ...formData, profit: e.target.value })}
+                          className="input w-full"
+                          placeholder="Leave empty if not calculated yet"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
