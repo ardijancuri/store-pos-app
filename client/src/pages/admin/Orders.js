@@ -243,6 +243,8 @@ const Orders = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [creatingOrder, setCreatingOrder] = useState(false);
+  const [updatingOrder, setUpdatingOrder] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -414,6 +416,7 @@ const Orders = () => {
     setSelectedShopManager('');
     setGuestInfo({ name: '', phone: '', note: '', embg: '', idCard: '' });
     setShowMoreGuestInfoCreate(false);
+    setCreatingOrder(false); // Reset loading state
   };
 
   useEffect(() => {
@@ -528,8 +531,11 @@ const Orders = () => {
 
   const createOrder = async () => {
     try {
+      setCreatingOrder(true);
+      
       if (selectedItems.length === 0) {
         toast.error('Please add at least one item to the order');
+        setCreatingOrder(false);
         return;
       }
 
@@ -555,14 +561,17 @@ const Orders = () => {
       // Validate guest information
       if (!guestInfo.name.trim()) {
         toast.error('Please enter guest name');
+        setCreatingOrder(false);
         return;
       }
       if (!guestInfo.phone.trim()) {
         toast.error('Please enter phone number');
+        setCreatingOrder(false);
         return;
       }
       if (!selectedShopManager) {
         toast.error('Please select a shop manager');
+        setCreatingOrder(false);
         return;
       }
 
@@ -587,6 +596,8 @@ const Orders = () => {
     } catch (error) {
       console.error('Error creating order:', error);
       toast.error(error.response?.data?.message || 'Failed to create order');
+    } finally {
+      setCreatingOrder(false);
     }
   };
 
@@ -602,8 +613,11 @@ const Orders = () => {
 
   const updateEditOrder = async () => {
     try {
+      setUpdatingOrder(true);
+      
       if (editSelectedItems.length === 0) {
         toast.error('Please add at least one item to the order');
+        setUpdatingOrder(false);
         return;
       }
 
@@ -630,6 +644,8 @@ const Orders = () => {
     } catch (error) {
       console.error('Error updating order:', error);
       toast.error('Failed to update order');
+    } finally {
+      setUpdatingOrder(false);
     }
   };
 
@@ -642,6 +658,7 @@ const Orders = () => {
     setEditGuestInfo({ name: '', phone: '', note: '', embg: '', idCard: '' });
     setEditDiscount(0);
     setShowMoreGuestInfo(false);
+    setUpdatingOrder(false); // Reset loading state
   };
 
   const fetchOrders = async () => {
@@ -2240,9 +2257,16 @@ const Orders = () => {
                 <button
                   onClick={createOrder}
                   className="btn-primary flex-1"
-                  disabled={selectedItems.length === 0}
+                  disabled={selectedItems.length === 0 || creatingOrder}
                 >
-                  Create Order
+                  {creatingOrder ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Order'
+                  )}
                 </button>
                 <button
                   onClick={closeCreateModal}
@@ -2612,9 +2636,16 @@ const Orders = () => {
                 <button
                   onClick={updateEditOrder}
                   className="btn-primary flex-1"
-                  disabled={editSelectedItems.length === 0}
+                  disabled={editSelectedItems.length === 0 || updatingOrder}
                 >
-                  Update Order
+                  {updatingOrder ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Order'
+                  )}
                 </button>
                 <button
                   onClick={closeEditModal}
