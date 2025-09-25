@@ -16,7 +16,7 @@ const AdminProducts = () => {
   const [modelCounts, setModelCounts] = useState({});
   const [availableCounts, setAvailableCounts] = useState({});
   const [modelPriceRanges, setModelPriceRanges] = useState({});
-  const [newModel, setNewModel] = useState({ name: '', price: undefined, warranty: undefined, storages: [], colors: [], condition: '', subcategory: '', storage_prices: {} });
+  const [newModel, setNewModel] = useState({ name: '', price: undefined, storages: [], colors: [], condition: '', subcategory: '', storage_prices: {} });
   const [showStockModal, setShowStockModal] = useState(false);
   const [stockDetails, setStockDetails] = useState({ model: '', items: [] });
   const [modelSearch, setModelSearch] = useState('');
@@ -189,7 +189,7 @@ const AdminProducts = () => {
   const closeAddModelModal = () => {
     setShowAddModelModal(false);
     setEditingModel(null);
-    setNewModel({ name: '', price: undefined, warranty: undefined, storages: [], colors: [], condition: '', subcategory: '', storage_prices: {} });
+    setNewModel({ name: '', price: undefined, storages: [], colors: [], condition: '', subcategory: '', storage_prices: {} });
   };
 
   const handleDeleteModel = async (modelId) => {
@@ -416,7 +416,6 @@ const AdminProducts = () => {
       const modelData = {
         name: newModel.name.trim(),
         price: typeof newModel.price === 'number' ? newModel.price : undefined,
-        warranty: typeof newModel.warranty === 'number' ? newModel.warranty : undefined,
         storages: (newModel.storages || []).filter(s => s && s.trim() !== ''),
         colors: (newModel.colors || []).filter(c => c && c.trim() !== ''),
         condition: (newModel.condition || '').trim() || undefined,
@@ -528,7 +527,6 @@ const AdminProducts = () => {
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Price (MKD)</th>
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Condition</th>
-                  <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Warranty</th>
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Storages</th>
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Colors</th>
                   <th className="px-2 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">All Products</th>
@@ -569,17 +567,6 @@ const AdminProducts = () => {
                     <td className="px-2 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-primary-700">{m.name}</td>
                     <td className="px-2 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatPriceDisplay(m.name)}</td>
                     <td className="px-2 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{m.condition ? m.condition : '-'}</td>
-                    <td className="px-2 sm:px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {m.warranty ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {m.warranty} months
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          No warranty
-                        </span>
-                      )}
-                    </td>
                     <td className="px-2 sm:px-4 lg:px-6 py-4 text-sm text-gray-900">
                       <div className="flex flex-wrap gap-1">
                         {(m.storages || []).map((s) => (
@@ -610,7 +597,6 @@ const AdminProducts = () => {
                             setNewModel({
                               name: m.name,
                               price: m.price,
-                              warranty: m.warranty,
                               storages: [...(m.storages || [])],
                               colors: [...(m.colors || [])],
                               condition: m.condition || '',
@@ -639,7 +625,7 @@ const AdminProducts = () => {
                 ))}
                 {models.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-6 py-6 text-center text-sm text-gray-500">No models found</td>
+                    <td colSpan={8} className="px-6 py-6 text-center text-sm text-gray-500">No models found</td>
                   </tr>
                 )}
               </tbody>
@@ -718,23 +704,6 @@ const AdminProducts = () => {
                       </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Warranty (Months) <span className="text-gray-400 text-xs">(Optional)</span></label>
-                        <input
-                          type="number"
-                          className="input w-full"
-                          min="0"
-                          max="60"
-                          value={newModel.warranty ?? ''}
-                          onChange={(e) => setNewModel({ ...newModel, warranty: e.target.value === '' ? undefined : Number(e.target.value) })}
-                          placeholder="e.g., 12 (leave empty for no warranty)"
-                        />
-                    </div>
-                    <div>
-                      {/* Empty div for grid alignment */}
-                    </div>
-                  </div>
 
                     <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Storages</label>

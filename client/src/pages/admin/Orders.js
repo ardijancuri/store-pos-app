@@ -71,7 +71,6 @@ const setLanguageFont = (doc, language, style = 'normal') => {
       doc.internal.unicode = true;
     }
     
-    console.log(`Using helvetica font for ${language} text`);
   } catch (error) {
     console.log('Font setting failed, using default helvetica');
     doc.setFont('helvetica', 'normal');
@@ -463,7 +462,8 @@ const Orders = () => {
         quantity: 1,
         price: product.price,
         name: product.name,
-        category: product.category
+        category: product.category,
+        warranty: 0 // Default warranty in months
       }]);
     }
   };
@@ -497,7 +497,8 @@ const Orders = () => {
         name: product.name,
         category: product.category,
         imei: product.imei,
-        barcode: product.barcode
+        barcode: product.barcode,
+        warranty: 0 // Default warranty in months
       }]);
     }
   };
@@ -810,7 +811,8 @@ const Orders = () => {
         name: item.product_name, // Map product_name to name for frontend compatibility
         category: item.category || 'accessories', // fallback to accessories if category is missing
         imei: item.imei,
-        barcode: item.barcode
+        barcode: item.barcode,
+        warranty: item.warranty || 0 // Include warranty field
       }));
 
       // Store original items for comparison
@@ -893,18 +895,13 @@ const Orders = () => {
 
   const generateWarrantyPDF = async (item) => {
     try {
-      // Get model information from models API to find warranty
-      const modelsResponse = await axios.get('/api/models');
-      const models = modelsResponse.data || [];
-      
-      // Find the model using helper function
-      const model = findModelForProduct(item.name, models);
-      const warrantyMonths = model?.warranty;
-
-      if (!warrantyMonths || warrantyMonths <= 0) {
+      // Check if item has warranty set
+      if (!item.warranty || item.warranty <= 0) {
         toast.error('This product does not have warranty coverage');
         return;
       }
+
+      const warrantyMonths = item.warranty;
 
       // Create PDF using jsPDF
       const { jsPDF } = await import('jspdf');
@@ -1127,9 +1124,8 @@ const Orders = () => {
 
       // Filter items that have warranty using helper function
       const itemsWithWarranty = orderItems.filter(item => {
-        const model = findModelForProduct(item.product_name, models);
-        
-        if (!model || !model.warranty || model.warranty <= 0) {
+        // Check if item has warranty set (greater than 0)
+        if (!item.warranty || item.warranty <= 0) {
           return false;
         }
         
@@ -1200,7 +1196,7 @@ const Orders = () => {
 
         // Find the model using helper function
         const model = findModelForProduct(item.product_name, models);
-        const warrantyMonths = model.warranty;
+        const warrantyMonths = item.warranty; // Use warranty from order item instead of model
 
         // Add header text overlay for this page
         renderHeader(doc, warrantyMonths, language);
@@ -2067,25 +2063,47 @@ const Orders = () => {
                           </div>
                           <div className="space-y-2">
                             {selectedItems.map(item => (
-                              <div key={item.productId} className="flex items-center justify-between p-2 bg-blue-50 rounded h-16 border border-blue-200">
-                                <div>
+                              <div key={item.productId} className="flex items-center justify-between p-3 bg-blue-50 rounded border border-blue-200">
+                                <div className="flex-1">
                                   <div className="font-medium text-sm">{item.name}</div>
                                   <div className="text-xs text-blue-600">
                                     {parseInt(item.price)} MKD each
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    max={products.find(p => p.id === item.productId)?.stock_quantity || 1}
-                                    value={item.quantity}
-                                    onChange={(e) => updateItemQuantity(item.productId, parseInt(e.target.value))}
-                                    className="w-16 input text-center h-8 py-1"
-                                  />
+                                  <div className="flex flex-col space-y-1">
+                                    <label className="text-xs text-gray-600">Qty:</label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max={products.find(p => p.id === item.productId)?.stock_quantity || 1}
+                                      value={item.quantity}
+                                      onChange={(e) => updateItemQuantity(item.productId, parseInt(e.target.value))}
+                                      className="w-16 input text-center h-8 py-1"
+                                    />
+                                  </div>
+                                  <div className="flex flex-col space-y-1">
+                                    <label className="text-xs text-gray-600">Warranty:</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="60"
+                                      value={item.warranty || 0}
+                                      onChange={(e) => {
+                                        const warranty = parseInt(e.target.value) || 0;
+                                        setSelectedItems(selectedItems.map(i =>
+                                          i.productId === item.productId
+                                            ? { ...i, warranty }
+                                            : i
+                                        ));
+                                      }}
+                                      className="w-20 input text-center h-8 py-1"
+                                      placeholder="0"
+                                    />
+                                  </div>
                                   <button
                                     onClick={() => removeItemFromOrder(item.productId)}
-                                    className="text-red-600 hover:text-red-800 text-sm"
+                                    className="text-red-600 hover:text-red-800 text-sm mt-6"
                                   >
                                     Remove
                                   </button>
@@ -2397,30 +2415,50 @@ const Orders = () => {
                             )}
                           </div>
                           <div className="flex items-center space-x-2">
-                            <input
-                              type="number"
-                              min="1"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const newQuantity = parseInt(e.target.value) || 1;
-                                // Find the product to check stock
-                                const product = products.find(p => p.id === item.productId);
-                                if (product && newQuantity > product.stock_quantity) {
-                                  toast.error(`Cannot set quantity to ${newQuantity}. Only ${product.stock_quantity} in stock.`);
-                                  return;
-                                }
+                            <div className="flex flex-col space-y-1">
+                              <label className="text-xs text-gray-600">Qty:</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const newQuantity = parseInt(e.target.value) || 1;
+                                  // Find the product to check stock
+                                  const product = products.find(p => p.id === item.productId);
+                                  if (product && newQuantity > product.stock_quantity) {
+                                    toast.error(`Cannot set quantity to ${newQuantity}. Only ${product.stock_quantity} in stock.`);
+                                    return;
+                                  }
 
-                                const newItems = [...editSelectedItems];
-                                newItems[index].quantity = newQuantity;
-                                setEditSelectedItems(newItems);
-                              }}
-                              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
-                            />
+                                  const newItems = [...editSelectedItems];
+                                  newItems[index].quantity = newQuantity;
+                                  setEditSelectedItems(newItems);
+                                }}
+                                className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                              />
+                            </div>
+                            <div className="flex flex-col space-y-1">
+                              <label className="text-xs text-gray-600">Warranty:</label>
+                              <input
+                                type="number"
+                                min="0"
+                                max="60"
+                                value={item.warranty || 0}
+                                onChange={(e) => {
+                                  const warranty = parseInt(e.target.value) || 0;
+                                  const newItems = [...editSelectedItems];
+                                  newItems[index].warranty = warranty;
+                                  setEditSelectedItems(newItems);
+                                }}
+                                className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                placeholder="0"
+                              />
+                            </div>
                             <button
                               onClick={() => {
                                 setEditSelectedItems(editSelectedItems.filter((_, i) => i !== index));
                               }}
-                              className="text-red-600 hover:text-red-900 p-1"
+                              className="text-red-600 hover:text-red-900 p-1 mt-4"
                               title="Remove item"
                             >
                               <Trash2 className="h-4 w-4" />

@@ -10,31 +10,40 @@ function checkItemsChanged(originalItems, newItems) {
     return true;
   }
 
-  // Create maps for comparison
+  // Create maps for comparison - now including warranty
   const originalMap = new Map();
   const newMap = new Map();
 
-  // Build maps with productId as key and quantity as value
+  // Build maps with productId as key and object with quantity and warranty as value
   originalItems.forEach(item => {
-    originalMap.set(item.productId || item.product_id, item.quantity);
+    const key = item.productId || item.product_id;
+    originalMap.set(key, {
+      quantity: item.quantity,
+      warranty: item.warranty || 0
+    });
   });
 
   newItems.forEach(item => {
-    newMap.set(item.productId, item.quantity);
+    newMap.set(item.productId, {
+      quantity: item.quantity,
+      warranty: item.warranty || 0
+    });
   });
 
-  // Check if all items in original exist in new with same quantities
-  for (const [productId, originalQty] of originalMap) {
-    const newQty = newMap.get(productId);
-    if (newQty === undefined || newQty !== originalQty) {
-      return true; // Item was removed, added, or quantity changed
+  // Check if all items in original exist in new with same quantities AND warranty
+  for (const [productId, originalData] of originalMap) {
+    const newData = newMap.get(productId);
+    if (newData === undefined || 
+        newData.quantity !== originalData.quantity || 
+        newData.warranty !== originalData.warranty) {
+      return true; // Item was removed, added, quantity changed, or warranty changed
     }
   }
 
   // Check if all items in new exist in original
-  for (const [productId, newQty] of newMap) {
-    const originalQty = originalMap.get(productId);
-    if (originalQty === undefined) {
+  for (const [productId, newData] of newMap) {
+    const originalData = originalMap.get(productId);
+    if (originalData === undefined) {
       return true; // New item was added
     }
   }
@@ -182,7 +191,7 @@ router.get('/:id', authenticateToken, requireAdminOrManager, async (req, res) =>
 
     // Get order items
     const itemsResult = await query(`
-      SELECT oi.quantity, oi.price,
+      SELECT oi.quantity, oi.price, oi.warranty,
              p.id as product_id, p.name as product_name, p.description, p.category,
              p.imei, p.barcode, p.battery
       FROM order_items oi
@@ -207,6 +216,7 @@ router.post('/', [
   body('items').isArray({ min: 1 }),
   body('items.*.productId').isInt({ min: 1 }),
   body('items.*.quantity').isInt({ min: 1 }),
+  body('items.*.warranty').optional().isInt({ min: 0, max: 60 }),
   body('guestName').isString().trim().isLength({ min: 1 }),
   body('guestNote').optional({ nullable: true }).isString().trim().optional(),
   body('guestPhone').isString().trim().isLength({ min: 1 }),
@@ -258,7 +268,8 @@ router.post('/', [
         quantity: item.quantity,
         price: product.price,
         name: product.name,
-        category: product.category
+        category: product.category,
+        warranty: item.warranty || 0
       });
     }
 
@@ -278,8 +289,8 @@ router.post('/', [
     // Create order items and update stock
     for (const item of validatedItems) {
       await query(
-        'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)',
-        [orderId, item.productId, item.quantity, item.price]
+        'INSERT INTO order_items (order_id, product_id, quantity, price, warranty) VALUES ($1, $2, $3, $4, $5)',
+        [orderId, item.productId, item.quantity, item.price, item.warranty]
       );
 
       // Update stock quantity
@@ -374,7 +385,7 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
 
     // Get order items
     const itemsResult = await query(`
-      SELECT oi.quantity, oi.price,
+      SELECT oi.quantity, oi.price, oi.warranty,
              p.name as product_name, p.description, p.category, p.subcategory, p.model, p.storage_gb, p.color, p.imei
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
@@ -475,133 +486,66 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
     // Draw line under header
     drawLine(tableY + 15);
 
-    // Items - Separated by Currency
+    // Items - All products use MKD currency
     let currentY = tableY + 25;
     doc.fontSize(9).font('Helvetica').fillColor(black);
     
-    // Separate items by category
-    const eurItems = itemsResult.rows.filter(item => item.category === 'smartphones');
-    const mkdItems = itemsResult.rows.filter(item => item.category !== 'smartphones');
-    
-    // EUR Products (Smartphones) Section
-    if (eurItems.length > 0) {
-      // Section header
-      doc.fontSize(9).font('Helvetica-Bold').fillColor('#059669'); // Green color for EUR
-      doc.text('EUR Products (Smartphones)', 60, currentY);
+    // Display all items in a single section
+    itemsResult.rows.forEach((item, index) => {
+      const price = parseFloat(item.price);
+      const itemTotal = item.quantity * price;
+      
+      // Alternate row colors (light gray for even rows)
+      if (index % 2 === 1) {
+        doc.rect(50, currentY - 5, 500, 20).fill('#f9fafb');
+      }
+      
+      // Explicitly set text color to black for each row
+      doc.fillColor(black);
+      
+      // Set font size to 9 for product details
+      doc.fontSize(9).font('Helvetica');
+      
+      // For smartphones, show subcategory • model, otherwise just product name
+      const displayName = item.subcategory && item.model 
+        ? `${item.subcategory} • ${item.model}`
+        : item.product_name;
+      doc.text(displayName, 55, currentY);
+      
+      // Details column - show storage and color if available
+      const details = [];
+      if (item.storage_gb) details.push(item.storage_gb);
+      if (item.color) details.push(item.color);
+      const detailsText = details.length > 0 ? details.join(' • ') : '-';
+      doc.text(detailsText, 150, currentY);
+      
+      // IMEI column
+      const imeiText = item.imei || '-';
+      doc.text(imeiText, 240, currentY);
+      
+      doc.text(item.quantity.toString(), 320, currentY);
+      doc.text(`${price.toFixed(0)} MKD`, 370, currentY);
+      doc.text(`${itemTotal.toFixed(0)} MKD`, 450, currentY);
+      
       currentY += 20;
-      
-      eurItems.forEach((item, index) => {
-        const price = parseFloat(item.price);
-        const itemTotal = item.quantity * price;
-        
-        // Alternate row colors (light green for even rows)
-        if (index % 2 === 1) {
-          doc.rect(50, currentY - 5, 500, 20).fill('#ecfdf5');
-        }
-        
-        // Explicitly set text color to black for each row
-        doc.fillColor(black);
-        
-        // Set font size to 9 for product details
-        doc.fontSize(9).font('Helvetica');
-        
-        // For smartphones, show subcategory • model, otherwise just product name
-        const displayName = item.subcategory && item.model 
-          ? `${item.subcategory} • ${item.model}`
-          : item.product_name;
-        doc.text(displayName, 55, currentY);
-        
-        // Details column - show storage and color if available
-        const details = [];
-        if (item.storage_gb) details.push(item.storage_gb);
-        if (item.color) details.push(item.color);
-        const detailsText = details.length > 0 ? details.join(' • ') : '-';
-        doc.text(detailsText, 150, currentY);
-        
-        // IMEI column
-        const imeiText = item.imei || '-';
-        doc.text(imeiText, 240, currentY);
-        
-        doc.text(item.quantity.toString(), 320, currentY);
-        doc.text(`${price.toFixed(0)} EUR`, 370, currentY);
-        doc.text(`${itemTotal.toFixed(0)} EUR`, 450, currentY);
-        
-        currentY += 20;
-      });
-      
-      currentY += 10; // Add space between sections
-    }
-    
-    // MKD Products (Accessories) Section
-    if (mkdItems.length > 0) {
-      // Section header
-      doc.fontSize(9).font('Helvetica-Bold').fillColor('#1d4ed8'); // Blue color for MKD
-      doc.text('MKD Products (Accessories)', 60, currentY);
-      currentY += 20;
-      
-      mkdItems.forEach((item, index) => {
-        const price = parseFloat(item.price);
-        const itemTotal = item.quantity * price;
-        
-        // Alternate row colors (light blue for even rows)
-        if (index % 2 === 1) {
-          doc.rect(50, currentY - 5, 500, 20).fill('#eff6ff');
-        }
-        
-        // Explicitly set text color to black for each row
-        doc.fillColor(black);
-        
-        // Set font size to 9 for product details
-        doc.fontSize(9).font('Helvetica');
-        
-        doc.text(item.product_name, 55, currentY);
-        
-        // Details column - show storage and color if available
-        const details = [];
-        if (item.storage_gb) details.push(item.storage_gb);
-        if (item.color) details.push(item.color);
-        const detailsText = details.length > 0 ? details.join(' • ') : '-';
-        doc.text(detailsText, 150, currentY);
-        
-        // IMEI column
-        const imeiText = item.imei || '-';
-        doc.text(imeiText, 240, currentY);
-        
-        doc.text(item.quantity.toString(), 320, currentY);
-        doc.text(`${price.toFixed(0)} MKD`, 370, currentY);
-        doc.text(`${itemTotal.toFixed(0)} MKD`, 450, currentY);
-        
-        currentY += 20;
-      });
-    }
+    });
 
     // Draw line after items
     drawLine(currentY + 5);
 
-    // Calculate totals by currency
-    const eurTotal = eurItems.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
-    const mkdTotal = mkdItems.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
+    // Calculate totals (all items use MKD currency)
+    const totalAmount = itemsResult.rows.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
     
     // Calculate discount if not already set
     let actualDiscount = parseFloat(order.discount_amount || 0);
     if (actualDiscount === 0) {
-      const originalTotal = eurTotal + mkdTotal;
       const finalTotal = parseFloat(order.total_amount || 0);
-      if (originalTotal > finalTotal) {
-        actualDiscount = originalTotal - finalTotal;
+      if (totalAmount > finalTotal) {
+        actualDiscount = totalAmount - finalTotal;
       }
     }
     
-    console.log('Discount calculation:', {
-      discount_amount: order.discount_amount,
-      eurTotal,
-      mkdTotal,
-      originalTotal: eurTotal + mkdTotal,
-      finalTotal: order.total_amount,
-      calculatedDiscount: actualDiscount
-    });
-    
-    // Total Section - Separated by Currency
+    // Total Section - Single MKD total
     const totalY = currentY + 20;
     const totalBoxX = 350; // Moved to right side of page
     const totalBoxWidth = 180;
@@ -623,52 +567,27 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
       doc.fontSize(12)
         .font('Helvetica-Bold')
         .fillColor('#dc2626')
-        .text(`-${actualDiscount.toFixed(0)} ${order.discount_currency || 'EUR'}`, totalBoxX + 10, totalSectionY, { width: totalBoxWidth - 20, align: 'right' });
+        .text(`-${actualDiscount.toFixed(0)} MKD`, totalBoxX + 10, totalSectionY, { width: totalBoxWidth - 20, align: 'right' });
       
       totalSectionY += 35; // Space for next total
     }
     
-    // EUR Total (if any)
-    if (eurTotal > 0) {
-      // Draw box around EUR total
-      drawBox(totalBoxX, totalSectionY - 10, totalBoxWidth, 25);
-      
-      // Label on the left
-      doc.fontSize(12)
-        .font('Helvetica-Bold')
-        .fillColor(black) // Black color for EUR total
-        .text('Total EUR:', totalBoxX + 10, totalSectionY);
-
-      // Amount right-aligned within the box - show discounted amount if discount exists
-      const displayEurTotal = actualDiscount > 0 && eurTotal > 0 ? eurTotal - actualDiscount : eurTotal;
-      doc.fontSize(12)
-        .font('Helvetica-Bold')
-        .fillColor(black)
-        .text(`${displayEurTotal.toFixed(0)} EUR`, totalBoxX + 10, totalSectionY, { width: totalBoxWidth - 20, align: 'right' });
-      
-      totalSectionY += 35; // Space for next total
-    }
+    // MKD Total
+    // Draw box around MKD total
+    drawBox(totalBoxX, totalSectionY - 10, totalBoxWidth, 25);
     
-    // MKD Total (if any)
-    if (mkdTotal > 0) {
-      // Draw box around MKD total
-      drawBox(totalBoxX, totalSectionY - 10, totalBoxWidth, 25);
-      
-      // Label on the left
-      doc.fontSize(12)
-        .font('Helvetica-Bold')
-        .fillColor(black) // Black color for MKD total
-        .text('Total MKD:', totalBoxX + 10, totalSectionY);
+    // Label on the left
+    doc.fontSize(12)
+      .font('Helvetica-Bold')
+      .fillColor(black) // Black color for MKD total
+      .text('Total MKD:', totalBoxX + 10, totalSectionY);
 
-      // Amount right-aligned within the box - show discounted amount if discount exists
-      const displayMkdTotal = actualDiscount > 0 && mkdTotal > 0 ? mkdTotal - actualDiscount : mkdTotal;
-      doc.fontSize(12)
-        .font('Helvetica-Bold')
-        .fillColor(black)
-        .text(`${displayMkdTotal.toFixed(0)} MKD`, totalBoxX + 10, totalSectionY, { width: totalBoxWidth - 20, align: 'right' });
-      
-      totalSectionY += 35; // Space for next total
-    }
+    // Amount right-aligned within the box - show discounted amount if discount exists
+    const displayTotal = actualDiscount > 0 ? totalAmount - actualDiscount : totalAmount;
+    doc.fontSize(12)
+      .font('Helvetica-Bold')
+      .fillColor(black)
+      .text(`${displayTotal.toFixed(0)} MKD`, totalBoxX + 10, totalSectionY, { width: totalBoxWidth - 20, align: 'right' });
 
 
     
@@ -701,6 +620,7 @@ router.put('/:id', authenticateToken, requireAdminOrManager, [
   body('items.*.productId').isInt({ min: 1 }).withMessage('Product ID must be a positive integer'),
   body('items.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be a positive integer'),
   body('items.*.price').isFloat({ min: 0 }).withMessage('Price must be a positive number'),
+  body('items.*.warranty').optional().isInt({ min: 0, max: 60 }).withMessage('Warranty must be between 0 and 60 months'),
   body('discount').optional().isFloat({ min: 0 }).withMessage('Discount must be a positive number'),
   body('guestName').optional().isString().trim().isLength({ min: 1 }).withMessage('Guest name must be a non-empty string'),
   body('guestPhone').optional().isString().trim().isLength({ min: 1 }).withMessage('Guest phone must be a non-empty string'),
@@ -708,11 +628,9 @@ router.put('/:id', authenticateToken, requireAdminOrManager, [
   body('guestEmbg').optional().isString().trim().optional(),
   body('guestIdCard').optional().isString().trim().optional()
 ], async (req, res) => {
-  console.log('Update order request:', { orderId: req.params.id, body: req.body });
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('Validation errors:', errors.array());
       return res.status(400).json({ 
         message: 'Validation error', 
         errors: errors.array() 
@@ -799,14 +717,10 @@ router.put('/:id', authenticateToken, requireAdminOrManager, [
           'UPDATE orders SET total_amount = $1 WHERE id = $2',
           [finalTotal, orderId]
         );
-        console.log(`Updated order total with new discount: ${discount}, final total: ${finalTotal}`);
       }
 
       // Update order items if provided
       if (items && Array.isArray(items)) {
-        console.log('Updating order items:', { orderId, itemsCount: items.length });
-        console.log('Items to insert:', JSON.stringify(items, null, 2));
-
         // Fetch current order items from database for comparison
         const currentItemsResult = await client.query(`
           SELECT oi.product_id, oi.quantity, oi.price, p.category
@@ -815,14 +729,11 @@ router.put('/:id', authenticateToken, requireAdminOrManager, [
           WHERE oi.order_id = $1
         `, [orderId]);
         const currentItems = currentItemsResult.rows;
-        console.log('Current items from database:', currentItems);
 
         // Check if items actually changed by comparing with current database items
         const itemsChanged = checkItemsChanged(currentItems, items);
-        console.log('Items changed:', itemsChanged);
 
         if (!itemsChanged) {
-          console.log('No item changes detected, skipping item updates');
           // If only status changed, still update it
           if (status) {
             await client.query('UPDATE orders SET status = $1 WHERE id = $2', [status, orderId]);
@@ -837,17 +748,6 @@ router.put('/:id', authenticateToken, requireAdminOrManager, [
         }
         
         // Use the already fetched current items for stock restoration
-        console.log('Current items to restore stock:', currentItems);
-        
-        // Also get current stock levels for debugging
-        for (const item of currentItems) {
-          const stockResult = await client.query(
-            'SELECT stock_quantity FROM products WHERE id = $1',
-            [item.product_id]
-          );
-          const currentStock = stockResult.rows[0]?.stock_quantity || 0;
-          console.log(`Product ${item.product_id} current stock: ${currentStock}, will restore: ${item.quantity}`);
-        }
         
         // Restore stock for all current items
         for (const item of currentItems) {
@@ -855,34 +755,14 @@ router.put('/:id', authenticateToken, requireAdminOrManager, [
             'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
             [item.quantity, item.product_id]
           );
-          console.log(`Restored ${item.quantity} units to product ${item.product_id}`);
-        }
-        
-        // Verify stock restoration worked
-        for (const item of currentItems) {
-          const stockResult = await client.query(
-            'SELECT stock_quantity FROM products WHERE id = $1',
-            [item.product_id]
-          );
-          const newStock = stockResult.rows[0]?.stock_quantity || 0;
-          console.log(`Product ${item.product_id} stock after restoration: ${newStock}`);
         }
         
         
         // Delete existing order items
-        const deleteResult = await client.query('DELETE FROM order_items WHERE order_id = $1', [orderId]);
-        console.log('Deleted existing items:', deleteResult.rowCount);
+        await client.query('DELETE FROM order_items WHERE order_id = $1', [orderId]);
 
         // Insert new order items and reduce stock
         for (const item of items) {
-          console.log('Inserting item:', item);
-          console.log('Item fields:', { 
-            orderId, 
-            productId: item.productId, 
-            quantity: item.quantity, 
-            price: item.price 
-          });
-          
           // Check if we have enough stock
           const stockCheckResult = await client.query(
             'SELECT stock_quantity FROM products WHERE id = $1',
@@ -903,13 +783,11 @@ router.put('/:id', authenticateToken, requireAdminOrManager, [
             'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
             [item.quantity, item.productId]
           );
-          console.log(`Reduced ${item.quantity} units from product ${item.productId}`);
           
           const insertResult = await client.query(
-            'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)',
-            [orderId, item.productId, item.quantity, item.price]
+            'INSERT INTO order_items (order_id, product_id, quantity, price, warranty) VALUES ($1, $2, $3, $4, $5)',
+            [orderId, item.productId, item.quantity, item.price, item.warranty || 0]
           );
-          console.log('Inserted item result:', insertResult.rowCount);
         }
         
 
@@ -921,23 +799,19 @@ router.put('/:id', authenticateToken, requireAdminOrManager, [
         `, [orderId]);
 
         const totals = totalsResult.rows[0];
-        console.log('Calculated total:', totals);
         
         // Apply discount if provided, otherwise preserve existing discount
         let finalTotal = totals.total_amount || 0;
         if (discount !== undefined && discount > 0) {
           finalTotal = Math.max(0, finalTotal - discount);
-          console.log(`Applied new discount: ${discount}, final total: ${finalTotal}`);
         } else if (preserveDiscount && originalDiscount > 0) {
           finalTotal = Math.max(0, finalTotal - originalDiscount);
-          console.log(`Preserved discount: ${originalDiscount}, final total: ${finalTotal}`);
         }
         
         await client.query(
           'UPDATE orders SET total_amount = $1 WHERE id = $2',
           [finalTotal, orderId]
         );
-        console.log('Updated order total in database');
       }
 
       await client.query('COMMIT');
@@ -990,7 +864,6 @@ router.delete('/:id', authenticateToken, requireAdminOrManager, async (req, res)
       );
     }
 
-    console.log(`Restored stock for ${orderItemsResult.rows.length} products from order ${orderId}`);
 
     // Delete order items first (due to foreign key constraint)
     await client.query('DELETE FROM order_items WHERE order_id = $1', [orderId]);
@@ -999,7 +872,6 @@ router.delete('/:id', authenticateToken, requireAdminOrManager, async (req, res)
     await client.query('DELETE FROM orders WHERE id = $1', [orderId]);
 
     // Log the restoration action
-    console.log(`Order ${orderId} deleted and stock restored for ${orderItemsResult.rows.length} items`);
 
     await client.query('COMMIT');
 
