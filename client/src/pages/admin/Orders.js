@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { openPdfInNewTab } from '../../utils/pdfUtils';
+import { useAuth } from '../../contexts/AuthContext';
+import { AdminDateRangeSelector, AdminGenerateReportButton } from '../../components/AdminOnly';
 import {
   ShoppingCart,
   FileText,
@@ -12,7 +14,6 @@ import {
   Trash2,
   Scan,
   Download,
-  Calendar,
   Share2,
   Edit,
   ChevronDown,
@@ -240,12 +241,14 @@ const WARRANTY_TEXTS = {
 };
 
 const Orders = () => {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creatingOrder, setCreatingOrder] = useState(false);
   const [updatingOrder, setUpdatingOrder] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchDate, setSearchDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -275,7 +278,7 @@ const Orders = () => {
   useEffect(() => {
     setCurrentPage(1); // Reset to first page when searching
     fetchOrders();
-  }, [searchTerm]);
+  }, [searchTerm, searchDate]);
 
   useEffect(() => {
     fetchOrders();
@@ -670,6 +673,10 @@ const Orders = () => {
 
       if (searchTerm) {
         params.append('search', searchTerm);
+      }
+
+      if (searchDate) {
+        params.append('date', searchDate);
       }
 
       const response = await axios.get(`/api/orders?${params}`);
@@ -1597,6 +1604,18 @@ const Orders = () => {
               className="input"
             />
           </div>
+          
+          {/* Date Search */}
+          <div className="relative flex-1 sm:flex-none sm:w-40">
+            <input
+              type="date"
+              value={searchDate}
+              onChange={(e) => setSearchDate(e.target.value)}
+              className="input"
+              placeholder="Search by date..."
+            />
+          </div>
+          
           <button
             onClick={openCreateModal}
             className="btn-primary w-full sm:w-auto"
@@ -1617,35 +1636,19 @@ const Orders = () => {
           <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
             <h3 className="text-lg font-medium text-gray-900">All Orders</h3>
             <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:space-y-0 sm:gap-3">
-              {/* Date Range Selector */}
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="input text-sm w-36"
-                  placeholder="From"
-                />
-                <span className="text-gray-500">to</span>
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="input text-sm w-36"
-                  placeholder="To"
-                />
-              </div>
+              {/* Date Range Selector - Admin only */}
+              <AdminDateRangeSelector 
+                dateFrom={dateFrom}
+                setDateFrom={setDateFrom}
+                dateTo={dateTo}
+                setDateTo={setDateTo}
+              />
 
-              {/* Generate Report Button */}
-              <button
+              {/* Generate Report Button - Admin only */}
+              <AdminGenerateReportButton 
                 onClick={generateOrdersReport}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
                 title="Generate PDF report of orders in selected date range"
-              >
-                <Download className="h-4 w-4" />
-                Generate Report
-              </button>
+              />
             </div>
           </div>
         </div>

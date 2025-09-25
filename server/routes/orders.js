@@ -58,7 +58,7 @@ const router = express.Router();
 // Get orders (admin: all orders, client: own orders)
 router.get('/', authenticateToken, requireAdminOrManager, async (req, res) => {
   try {
-    const { page = 1, limit = 10, status = '', search = '', sortBy = 'created_at', sortOrder = 'desc' } = req.query;
+    const { page = 1, limit = 10, status = '', search = '', date = '', sortBy = 'created_at', sortOrder = 'desc' } = req.query;
     const offset = (page - 1) * limit;
     
 
@@ -102,6 +102,13 @@ router.get('/', authenticateToken, requireAdminOrManager, async (req, res) => {
     if (search && search.trim()) {
       whereConditions.push(`(o.id::text ILIKE $${paramCount} OR sm.name ILIKE $${paramCount} OR o.guest_name ILIKE $${paramCount})`);
       queryParams.push(`%${search.trim()}%`);
+      paramCount++;
+    }
+
+    // Date filter
+    if (date && date.trim()) {
+      whereConditions.push(`DATE(o.created_at) = $${paramCount}`);
+      queryParams.push(date.trim());
       paramCount++;
     }
 

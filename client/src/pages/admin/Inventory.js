@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../../contexts/AuthContext';
+import { AdminDateRangeSelector, AdminGenerateReportButton, AdminBarcodeReportButton } from '../../components/AdminOnly';
 import {
   Plus,
   Edit,
   Trash2,
   Scan,
   Download,
-  Calendar,
   Eye,
   Barcode
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import BarcodeScanner from '../../components/BarcodeScanner';
 import { openPdfInNewTab } from '../../utils/pdfUtils';
 
 const Inventory = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1065,45 +1067,27 @@ const Inventory = () => {
           </button>
         </nav>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-500" />
-            <input
-              type="date"
-              lang="en-GB"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="input text-sm w-36"
-            />
-            <span className="text-gray-500">to</span>
-            <input
-              type="date"
-              lang="en-GB"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="input text-sm w-36"
-            />
-          </div>
-          <button
+          {/* Date Range Selector - Admin only */}
+          <AdminDateRangeSelector 
+            dateFrom={dateFrom}
+            setDateFrom={setDateFrom}
+            dateTo={dateTo}
+            setDateTo={setDateTo}
+            inputClassName="input text-sm w-36"
+          />
+          
+          {/* Generate Report Button - Admin only */}
+          <AdminGenerateReportButton 
             onClick={async () => { await generateInventoryReport(); }}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
             title="Generate PDF report of inventory in selected date range"
-          >
-            <Download className="h-4 w-4" />
-            Generate Report
-          </button>
-          <button
+          />
+          
+          {/* Barcode Report Button - Admin only */}
+          <AdminBarcodeReportButton 
             onClick={async () => { await generateBarcodesReport(); }}
             disabled={!dateFrom || !dateTo}
-            className={`px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors w-full sm:w-auto ${
-              !dateFrom || !dateTo
-                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
-            }`}
             title={!dateFrom || !dateTo ? "Please select both date filters to generate barcodes" : "Generate barcodes PDF (one per page) for selected date range"}
-          >
-            <Download className="h-4 w-4" />
-            Barcode
-          </button>
+          />
         </div>
         </div>
       </div>

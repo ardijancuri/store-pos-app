@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useAuth } from '../../contexts/AuthContext';
+import { AdminGenerateReportButton } from '../../components/AdminOnly';
 import { Plus, Trash2, Download } from 'lucide-react';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -7,6 +9,7 @@ import { jsPDF } from 'jspdf';
 import { openPdfInNewTab } from '../../utils/pdfUtils';
 
 const AdminProducts = () => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [models, setModels] = useState([]);
@@ -485,14 +488,11 @@ const AdminProducts = () => {
             )}
           </div>
           
-          <button
+          {/* Generate Report Button - Admin only */}
+          <AdminGenerateReportButton 
             onClick={generateProductsReport}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
             title="Generate PDF report of all products"
-          >
-            <Download className="h-4 w-4" />
-            Generate Report
-          </button>
+          />
           <button className="btn-primary w-full sm:w-auto" onClick={() => { setEditingModel(null); setNewModel({ name: '', price: undefined, storages: [], colors: [], condition: '', subcategory: '', storage_prices: {} }); setShowAddModelModal(true); }}>
             <Plus className="h-4 w-4 mr-2" />
             Add Product

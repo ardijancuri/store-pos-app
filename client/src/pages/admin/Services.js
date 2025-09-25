@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { openPdfInNewTab } from '../../utils/pdfUtils';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { useAuth } from '../../contexts/AuthContext';
+import { AdminDateRangeSelector, AdminGenerateReportButton } from '../../components/AdminOnly';
 import {
   Plus,
   Edit,
@@ -14,7 +15,6 @@ import {
   Phone,
   User,
   DollarSign,
-  Calendar,
   CheckCircle,
   Clock,
   FileText,
@@ -474,39 +474,24 @@ const Services = () => {
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
           {/* Date Range Selector - Admin only */}
-          {user?.role === 'admin' && (
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0" />
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="input text-sm w-36"
-                placeholder="From"
-              />
-              <span className="text-gray-500">to</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="input text-sm w-36"
-                placeholder="To"
-              />
-            </div>
-          )}
+          <AdminDateRangeSelector 
+            dateFrom={dateFrom}
+            setDateFrom={setDateFrom}
+            dateTo={dateTo}
+            setDateTo={setDateTo}
+            className="flex items-center gap-2"
+            inputClassName="input text-sm w-36"
+          />
           
           {/* Generate Report Button - Admin only */}
-          {user?.role === 'admin' && (
-            <button
-              onClick={generateServicesReport}
-              className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
-              title="Generate PDF report of services in selected date range"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Generate Report</span>
-              <span className="sm:hidden">Generate</span>
-            </button>
-          )}
+          <AdminGenerateReportButton 
+            onClick={generateServicesReport}
+            title="Generate PDF report of services in selected date range"
+            className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2 transition-colors w-full sm:w-auto"
+          >
+            <span className="hidden sm:inline">Generate Report</span>
+            <span className="sm:hidden">Generate</span>
+          </AdminGenerateReportButton>
           
           {/* Add Service Button */}
           <button
