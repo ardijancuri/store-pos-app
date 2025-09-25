@@ -648,7 +648,7 @@ const Services = () => {
                     )}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <Calendar className="h-4 w-4 text-gray-400 mr-2" />
+                        <Clock className="h-4 w-4 text-gray-400 mr-2" />
                         <span className="text-sm text-gray-900">
                           {formatDate(service.created_at)}
                         </span>

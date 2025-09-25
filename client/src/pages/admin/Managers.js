@@ -7,7 +7,6 @@ import {
   Trash2, 
   User, 
   Phone, 
-  Calendar,
   ShoppingCart,
   DollarSign,
   TrendingUp,
