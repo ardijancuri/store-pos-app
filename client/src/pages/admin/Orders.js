@@ -55,16 +55,104 @@ const arrayBufferToBase64 = (buffer) => {
   return btoa(binary);
 };
 
+// Helper function to load custom font from file
+const loadCustomFont = async (fontPath) => {
+  try {
+    const response = await fetch(fontPath);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const base64Font = arrayBufferToBase64(arrayBuffer);
+    return base64Font;
+  } catch (error) {
+    console.error(`Failed to load custom font ${fontPath}:`, error);
+    return null;
+  }
+};
+
+// Helper function to add custom fonts to jsPDF document
+const addCustomFontsToDoc = async (doc) => {
+  try {
+    let fontsLoaded = 0;
+    let lightFontLoaded = false;
+    let semiBoldFontLoaded = false;
+    
+    // Load Inter Light font
+    const lightFontBase64 = await loadCustomFont('/inter-light.ttf');
+    if (lightFontBase64) {
+      doc.addFileToVFS('inter-light.ttf', lightFontBase64);
+      doc.addFont('inter-light.ttf', 'InterLight', 'normal');
+      console.log('Custom Inter Light font added successfully');
+      fontsLoaded++;
+      lightFontLoaded = true;
+    } else {
+      console.warn('Failed to load Inter Light font');
+    }
+    
+    // Load Inter SemiBold font
+    const semiBoldFontBase64 = await loadCustomFont('/inter-semiBold.ttf');
+    if (semiBoldFontBase64) {
+      doc.addFileToVFS('inter-semiBold.ttf', semiBoldFontBase64);
+      doc.addFont('inter-semiBold.ttf', 'InterSemiBold', 'normal');
+      console.log('Custom Inter SemiBold font added successfully');
+      fontsLoaded++;
+      semiBoldFontLoaded = true;
+    } else {
+      console.warn('Failed to load Inter SemiBold font');
+    }
+    
+    // Return true if at least the light font is loaded (required for basic functionality)
+    // SemiBold is preferred but not critical
+    if (lightFontLoaded) {
+      console.log(`Font loading complete: ${fontsLoaded}/2 fonts loaded successfully`);
+      return true;
+    } else {
+      console.error('Critical: Inter Light font failed to load');
+      return false;
+    }
+  } catch (error) {
+    console.error('Failed to add custom fonts to document:', error);
+    return false;
+  }
+};
+
 // Helper function to set appropriate font for language
 const setLanguageFont = (doc, language, style = 'normal') => {
   try {
-    // For all languages, use helvetica with Unicode support
-    if (style === 'bold') {
-      doc.setFont('helvetica', 'bold');
-    } else if (style === 'italic') {
-      doc.setFont('helvetica', 'italic');
+    // For Macedonian language, use custom Inter fonts
+    if (language === 'macedonian') {
+      try {
+        if (style === 'bold') {
+          doc.setFont('InterSemiBold', 'normal');
+          console.log('Using InterSemiBold font for Macedonian bold text');
+        } else if (style === 'italic') {
+          doc.setFont('InterLight', 'italic');
+          console.log('Using InterLight italic font for Macedonian italic text');
+        } else {
+          doc.setFont('InterLight', 'normal');
+          console.log('Using InterLight font for Macedonian normal text');
+        }
+      } catch (fontError) {
+        console.log('Custom Inter fonts not available, falling back to helvetica');
+        // Fallback to helvetica if custom fonts are not available
+        if (style === 'bold') {
+          doc.setFont('helvetica', 'bold');
+        } else if (style === 'italic') {
+          doc.setFont('helvetica', 'italic');
+        } else {
+          doc.setFont('helvetica', 'normal');
+        }
+      }
     } else {
-      doc.setFont('helvetica', 'normal');
+      // For other languages, use helvetica with Unicode support
+      if (style === 'bold') {
+        doc.setFont('helvetica', 'bold');
+      } else if (style === 'italic') {
+        doc.setFont('helvetica', 'italic');
+      } else {
+        doc.setFont('helvetica', 'normal');
+      }
     }
     
     // Enable Unicode mode for better character support
@@ -90,6 +178,20 @@ const renderTextWithCyrillicSupport = (doc, text, x, y, options = {}) => {
       // For Cyrillic text, try to ensure proper encoding
       if (doc.internal) {
         doc.internal.unicode = true;
+      }
+      
+      // Try to use appropriate Inter font for Cyrillic text if available
+      try {
+        const currentFont = doc.internal.getFont();
+        if (currentFont && (currentFont.fontName === 'InterLight' || currentFont.fontName === 'InterSemiBold')) {
+          console.log(`Using ${currentFont.fontName} font for Cyrillic text`);
+        } else {
+          // Try to set InterLight font for Cyrillic text (default)
+          doc.setFont('InterLight', 'normal');
+          console.log('Switched to InterLight font for Cyrillic text');
+        }
+      } catch (fontError) {
+        console.log('Inter fonts not available for Cyrillic text, using current font');
       }
       
       // Split long text into multiple lines if needed
@@ -1170,6 +1272,15 @@ const Orders = () => {
       if (language === 'macedonian') {
         console.log('Setting up Cyrillic support for Macedonian language');
         setupCyrillicSupport(doc);
+        
+        // Load custom Inter fonts for Macedonian text
+        console.log('Loading custom Inter fonts for Macedonian language');
+        const fontsLoaded = await addCustomFontsToDoc(doc);
+        if (fontsLoaded) {
+          console.log('Custom Inter fonts loaded successfully for Macedonian language');
+        } else {
+          console.log('Failed to load custom fonts, will use fallback');
+        }
       }
 
       // Set document properties
@@ -1297,27 +1408,57 @@ const Orders = () => {
         // Customer information section - compact layout
         doc.setFontSize(14);
         setLanguageFont(doc, language, 'bold');
-        doc.text(WARRANTY_TEXTS[language].customerInfo, 20, yPos);
+        if (language === 'macedonian') {
+          renderTextWithCyrillicSupport(doc, WARRANTY_TEXTS[language].customerInfo, 20, yPos);
+        } else {
+          doc.text(WARRANTY_TEXTS[language].customerInfo, 20, yPos);
+        }
         yPos += 8;
 
         doc.setFontSize(11);
         setLanguageFont(doc, language, 'normal');
-        doc.text(`${WARRANTY_TEXTS[language].customerName} ${orderData.guest_name || orderData.client_name || 'N/A'}`, 20, yPos);
+        const customerNameText = `${WARRANTY_TEXTS[language].customerName} ${orderData.guest_name || orderData.client_name || 'N/A'}`;
+        if (language === 'macedonian') {
+          renderTextWithCyrillicSupport(doc, customerNameText, 20, yPos);
+        } else {
+          doc.text(customerNameText, 20, yPos);
+        }
         yPos += 6;
-        doc.text(`${WARRANTY_TEXTS[language].phone} ${orderData.guest_phone || orderData.client_phone || 'N/A'}`, 20, yPos);
+        
+        const phoneText = `${WARRANTY_TEXTS[language].phone} ${orderData.guest_phone || orderData.client_phone || 'N/A'}`;
+        if (language === 'macedonian') {
+          renderTextWithCyrillicSupport(doc, phoneText, 20, yPos);
+        } else {
+          doc.text(phoneText, 20, yPos);
+        }
         
         // Add additional customer details if available - compact layout
         let additionalInfoY = yPos + 6;
         if (orderData.guest_email) {
-          doc.text(`${WARRANTY_TEXTS[language].email} ${orderData.guest_email}`, 20, additionalInfoY);
+          const emailText = `${WARRANTY_TEXTS[language].email} ${orderData.guest_email}`;
+          if (language === 'macedonian') {
+            renderTextWithCyrillicSupport(doc, emailText, 20, additionalInfoY);
+          } else {
+            doc.text(emailText, 20, additionalInfoY);
+          }
           additionalInfoY += 5;
         }
         if (orderData.guest_embg) {
-          doc.text(`${WARRANTY_TEXTS[language].embg} ${orderData.guest_embg}`, 20, additionalInfoY);
+          const embgText = `${WARRANTY_TEXTS[language].embg} ${orderData.guest_embg}`;
+          if (language === 'macedonian') {
+            renderTextWithCyrillicSupport(doc, embgText, 20, additionalInfoY);
+          } else {
+            doc.text(embgText, 20, additionalInfoY);
+          }
           additionalInfoY += 5;
         }
         if (orderData.guest_id_card) {
-          doc.text(`${WARRANTY_TEXTS[language].idCard} ${orderData.guest_id_card}`, 20, additionalInfoY);
+          const idCardText = `${WARRANTY_TEXTS[language].idCard} ${orderData.guest_id_card}`;
+          if (language === 'macedonian') {
+            renderTextWithCyrillicSupport(doc, idCardText, 20, additionalInfoY);
+          } else {
+            doc.text(idCardText, 20, additionalInfoY);
+          }
         }
         
         yPos = Math.max(yPos + 12, additionalInfoY + 12);
@@ -1325,7 +1466,11 @@ const Orders = () => {
         // Warranty terms section - compact layout
         doc.setFontSize(14);
         setLanguageFont(doc, language, 'bold');
-        doc.text(WARRANTY_TEXTS[language].warrantyTerms, 20, yPos);
+        if (language === 'macedonian') {
+          renderTextWithCyrillicSupport(doc, WARRANTY_TEXTS[language].warrantyTerms, 20, yPos);
+        } else {
+          doc.text(WARRANTY_TEXTS[language].warrantyTerms, 20, yPos);
+        }
         yPos += 8;
 
         doc.setFontSize(8);
@@ -1345,7 +1490,12 @@ const Orders = () => {
         yPos = 270;
         doc.setFontSize(8);
         setLanguageFont(doc, language, 'italic');
-        doc.text(WARRANTY_TEXTS[language].generatedOn + ' ' + new Date().toLocaleString(), 20, yPos);
+        const generatedText = WARRANTY_TEXTS[language].generatedOn + ' ' + new Date().toLocaleString();
+        if (language === 'macedonian') {
+          renderTextWithCyrillicSupport(doc, generatedText, 20, yPos);
+        } else {
+          doc.text(generatedText, 20, yPos);
+        }
       }
 
       // Open PDF in new tab
