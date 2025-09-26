@@ -126,7 +126,7 @@ router.get('/', authenticateToken, requireAdminOrManager, async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const isManager = req.user.role === 'manager';
 
-    let selectFields = 'p.id, p.name, p.imei, p.description, p.stock_status, p.stock_quantity, p.created_at, p.barcode, p.category, p.subcategory, p.model, p.color, p.storage_gb, p.battery, MIN(o.created_at) as date_sold, (ARRAY_AGG(o.id ORDER BY o.created_at ASC))[1] as first_order_id';
+    let selectFields = 'p.id, p.name, p.imei, p.description, p.stock_status, p.stock_quantity, p.created_at, p.barcode, p.category, p.subcategory, p.model, p.color, p.storage_gb, p.battery, p.fromclient as "fromClient", p.clientname as "clientName", p.contact, MIN(o.created_at) as date_sold, (ARRAY_AGG(o.id ORDER BY o.created_at ASC))[1] as first_order_id';
     if (isAdmin || isManager) {
       selectFields += ', p.price';
     }
@@ -385,7 +385,10 @@ router.post('/', [
       throw new Error('Battery must be between 0 and 100 percent');
     }
     return true;
-  })
+  }),
+  body('fromClient').optional().isBoolean().withMessage('fromClient must be a boolean'),
+  body('clientName').optional().trim().isLength({ max: 255 }).withMessage('Client name must be less than 255 characters'),
+  body('contact').optional().trim().isLength({ max: 255 }).withMessage('Contact must be less than 255 characters')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -396,7 +399,7 @@ router.post('/', [
       });
     }
 
-    const { name, imei, description, price, stock_status = 'enabled', stock_quantity = 0, barcode, category = 'accessories', subcategory, color, storage_gb, model, battery } = req.body;
+    const { name, imei, description, price, stock_status = 'enabled', stock_quantity = 0, barcode, category = 'accessories', subcategory, color, storage_gb, model, battery, fromClient = false, clientName, contact } = req.body;
 
     // Fetch allowed subcategories from settings and models from models table
     const settingsResult = await query('SELECT smartphone_subcategories, accessory_subcategories FROM settings ORDER BY id LIMIT 1');
@@ -448,8 +451,8 @@ router.post('/', [
     const cleanStockQuantity = enforcedStockQuantity === '' ? null : enforcedStockQuantity;
 
     const result = await query(
-      'INSERT INTO products (name, imei, description, price, stock_status, stock_quantity, barcode, category, subcategory, model, color, storage_gb, battery) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
-      [name, cleanImei, cleanDescription, cleanPrice, stock_status, cleanStockQuantity, cleanBarcode, category, cleanSubcategory, cleanModel, cleanColor, cleanStorageGb, cleanBattery]
+      'INSERT INTO products (name, imei, description, price, stock_status, stock_quantity, barcode, category, subcategory, model, color, storage_gb, battery, fromClient, clientName, contact) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *',
+      [name, cleanImei, cleanDescription, cleanPrice, stock_status, cleanStockQuantity, cleanBarcode, category, cleanSubcategory, cleanModel, cleanColor, cleanStorageGb, cleanBattery, fromClient, clientName || null, contact || null]
     );
 
     res.status(201).json({
@@ -519,7 +522,10 @@ router.put('/:id', [
       throw new Error('Battery must be between 0 and 100 percent');
     }
     return true;
-  })
+  }),
+  body('fromClient').optional().isBoolean().withMessage('fromClient must be a boolean'),
+  body('clientName').optional().trim().isLength({ max: 255 }).withMessage('Client name must be less than 255 characters'),
+  body('contact').optional().trim().isLength({ max: 255 }).withMessage('Contact must be less than 255 characters')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -531,7 +537,7 @@ router.put('/:id', [
     }
 
     const productId = parseInt(req.params.id);
-    const { name, imei, description, price, stock_status, stock_quantity, barcode, category, subcategory, color, storage_gb, battery } = req.body;
+    const { name, imei, description, price, stock_status, stock_quantity, barcode, category, subcategory, color, storage_gb, battery, fromClient, clientName, contact } = req.body;
 
     // Fetch current product to determine effective category if not provided
     const currentResult = await query('SELECT category FROM products WHERE id = $1', [productId]);
@@ -638,6 +644,24 @@ router.put('/:id', [
       updates.push(`battery = $${paramCount}`);
       const batteryValue = battery === '' || battery === null || battery === undefined ? null : battery;
       values.push(batteryValue);
+      paramCount++;
+    }
+
+    if (fromClient !== undefined) {
+      updates.push(`fromClient = $${paramCount}`);
+      values.push(fromClient);
+      paramCount++;
+    }
+
+    if (clientName !== undefined) {
+      updates.push(`clientName = $${paramCount}`);
+      values.push(clientName === '' ? null : clientName);
+      paramCount++;
+    }
+
+    if (contact !== undefined) {
+      updates.push(`contact = $${paramCount}`);
+      values.push(contact === '' ? null : contact);
       paramCount++;
     }
 

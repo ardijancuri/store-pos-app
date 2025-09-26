@@ -106,7 +106,10 @@ const Inventory = () => {
     subcategory: '',
     color: '',
     storage_gb: '',
-    battery: ''
+    battery: '',
+    fromClient: false,
+    clientName: '',
+    contact: ''
   });
 
   useEffect(() => {
@@ -351,7 +354,10 @@ const Inventory = () => {
       price: parseInt(formData.price) || 0,
       stock_quantity: formData.category === 'smartphones' ? 1 : (parseInt(formData.stock_quantity) || 0),
       subcategory: formData.subcategory || '', // Keep empty string, don't convert to null
-      battery: formData.battery && formData.battery !== '' ? parseInt(formData.battery) : null
+      battery: formData.battery && formData.battery !== '' ? parseInt(formData.battery) : null,
+      fromClient: formData.fromClient || false,
+      clientName: formData.fromClient ? (formData.clientName || '') : '',
+      contact: formData.fromClient ? (formData.contact || '') : ''
     };
 
     try {
@@ -413,7 +419,10 @@ const Inventory = () => {
       subcategory: product.subcategory || '',
       color: product.color || '',
       storage_gb: product.storage_gb || '',
-      battery: product.battery !== null && product.battery !== undefined ? product.battery.toString() : ''
+      battery: product.battery !== null && product.battery !== undefined ? product.battery.toString() : '',
+      fromClient: product.fromClient || false,
+      clientName: product.clientName || '',
+      contact: product.contact || ''
     });
     setShowModal(true);
   };
@@ -451,7 +460,10 @@ const Inventory = () => {
       subcategory: '',
       color: '',
       storage_gb: '',
-      battery: ''
+      battery: '',
+      fromClient: false,
+      clientName: '',
+      contact: ''
     });
     setEditingProduct(null);
     setEditingImei(null);
@@ -1653,6 +1665,52 @@ const Inventory = () => {
                           )}
                         </div>
                       </div>
+                      </>
+                    )}
+
+                    {/* From Client checkbox and fields - only for smartphones */}
+                    {formData.category === 'smartphones' && (
+                      <>
+                        <div>
+                          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={formData.fromClient}
+                              onChange={(e) => setFormData({ ...formData, fromClient: e.target.checked, clientName: e.target.checked ? formData.clientName : '', contact: e.target.checked ? formData.contact : '' })}
+                              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            From Client
+                          </label>
+                        </div>
+
+                        {formData.fromClient && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Client Name
+                              </label>
+                              <input
+                                type="text"
+                                value={formData.clientName}
+                                onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
+                                className="input"
+                                placeholder="Enter client name"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Contact
+                              </label>
+                              <input
+                                type="text"
+                                value={formData.contact}
+                                onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                                className="input"
+                                placeholder="Enter contact info"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
 

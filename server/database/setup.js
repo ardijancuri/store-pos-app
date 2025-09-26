@@ -89,6 +89,28 @@ async function setupDatabase() {
       ADD COLUMN IF NOT EXISTS imei VARCHAR(255)
     `);
 
+    // Add battery column if it doesn't exist
+    await run(`
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS battery INTEGER
+    `);
+
+    // Add client-related columns if they don't exist
+    await run(`
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS fromClient BOOLEAN DEFAULT false
+    `);
+    
+    await run(`
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS clientName VARCHAR(255)
+    `);
+    
+    await run(`
+      ALTER TABLE products
+      ADD COLUMN IF NOT EXISTS contact VARCHAR(255)
+    `);
+
     // Remove image column if it exists (this will fail if column doesn't exist, but that's okay)
     try {
       await run(`
