@@ -17,7 +17,8 @@ const Dashboard = () => {
     totalUsers: 0,
     totalRevenue: 0,
     recentOrders: [],
-    lowStockProducts: []
+    lowStockProducts: [],
+    lowStockModels: []
   });
   const [loading, setLoading] = useState(true);
 
@@ -34,21 +35,30 @@ const Dashboard = () => {
         axios.get('/api/orders/revenue')
       ]);
 
-      const orders = ordersRes.data.orders;
-      const lowStockModels = (modelsRes.data.lowStockModels || []).slice(0, 4);
+      const orders = ordersRes.data.orders || [];
+      const lowStockModels = (modelsRes.data?.lowStockModels || []).slice(0, 4);
 
       // Calculate stats
-      const totalRevenue = revenueRes.data.totalRevenue || 0;
+      const totalRevenue = revenueRes.data?.totalRevenue || 0;
 
       setStats({
-        totalOrders: ordersRes.data.pagination.totalOrders,
-        totalUsers: usersRes.data.pagination.totalUsers,
+        totalOrders: ordersRes.data?.pagination?.totalOrders || 0,
+        totalUsers: usersRes.data?.pagination?.totalUsers || 0,
         totalRevenue,
         recentOrders: orders,
         lowStockModels
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      // Set default values to prevent crashes
+      setStats({
+        totalOrders: 0,
+        totalUsers: 0,
+        totalRevenue: 0,
+        recentOrders: [],
+        lowStockProducts: [],
+        lowStockModels: []
+      });
     } finally {
       setLoading(false);
     }

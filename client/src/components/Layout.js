@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
-  const { user, logout, isAdmin, isManager } = useAuth();
+  const { user, logout, isAdmin, isManager, isServices } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -45,7 +45,11 @@ const Layout = ({ children }) => {
     { name: 'Services', path: '/admin/services', icon: Wrench },
   ];
 
-  const navItems = isAdmin ? adminNavItems : isManager ? managerNavItems : [];
+  const servicesNavItems = [
+    { name: 'Services', path: '/admin/services', icon: Wrench },
+  ];
+
+  const navItems = isAdmin ? adminNavItems : isManager ? managerNavItems : isServices ? servicesNavItems : [];
 
   const NavItem = ({ item }) => {
     const isActive = location.pathname === item.path;

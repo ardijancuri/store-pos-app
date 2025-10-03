@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 
 const Services = () => {
-  const { user } = useAuth();
+  const { user, isAdmin, isServices } = useAuth();
+  const canViewProfit = isAdmin || isServices;
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -228,7 +229,7 @@ const Services = () => {
 
       // Calculate totals first
       const totalPrice = allServices.reduce((sum, service) => sum + (parseFloat(service.price) || 0), 0);
-      const totalProfit = user?.role === 'admin' ? allServices.reduce((sum, service) => sum + (parseFloat(service.profit) || 0), 0) : 0;
+      const totalProfit = canViewProfit ? allServices.reduce((sum, service) => sum + (parseFloat(service.profit) || 0), 0) : 0;
       
       // Add header
       doc.setFontSize(20);
@@ -273,13 +274,13 @@ const Services = () => {
         
         // Move totals down one line
         doc.text(`Total Price: ${totalPrice.toFixed(0)} MKD`, 20, 51);
-        if (user?.role === 'admin') {
+        if (canViewProfit) {
           doc.text(`Total Profit: ${totalProfit.toFixed(0)} MKD`, 20, 58);
         }
       } else {
         // No date filter - show totals at original position
         doc.text(`Total Price: ${totalPrice.toFixed(0)} MKD`, 20, 44);
-        if (user?.role === 'admin') {
+        if (canViewProfit) {
           doc.text(`Total Profit: ${totalProfit.toFixed(0)} MKD`, 20, 51);
         }
       }
@@ -298,7 +299,7 @@ const Services = () => {
       const colPhoneModel = tableStartX + 70;
       const colStatus = tableStartX + 120;
       const colPrice = tableStartX + 150;
-      const colProfit = user?.role === 'admin' ? tableStartX + 170 : null;
+      const colProfit = canViewProfit ? tableStartX + 170 : null;
       
       // Table headers with gray background and border
       doc.setFontSize(9); // Slightly smaller for more compact look
@@ -315,7 +316,7 @@ const Services = () => {
       doc.text('Phone Model', colPhoneModel, yPosition);
       doc.text('Status', colStatus, yPosition);
       doc.text('Price', colPrice + 15, yPosition, { align: 'right' });
-      if (user?.role === 'admin') {
+      if (canViewProfit) {
         doc.text('Profit', colProfit + 15, yPosition, { align: 'right' });
       }
       
@@ -347,7 +348,7 @@ const Services = () => {
           doc.text('Phone Model', colPhoneModel, yPosition);
           doc.text('Status', colStatus, yPosition);
           doc.text('Price', colPrice + 15, yPosition, { align: 'right' });
-          if (user?.role === 'admin') {
+          if (canViewProfit) {
             doc.text('Profit', colProfit + 15, yPosition, { align: 'right' });
           }
           
@@ -384,7 +385,7 @@ const Services = () => {
         const profit = parseFloat(service.profit) || 0;
         
         doc.text(price > 0 ? price.toFixed(0) : '-', colPrice + 15, yPosition, { align: 'right' });
-        if (user?.role === 'admin') {
+        if (canViewProfit) {
           doc.text(profit > 0 ? profit.toFixed(0) : '-', colProfit + 15, yPosition, { align: 'right' });
         }
         
@@ -583,7 +584,7 @@ const Services = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  {user?.role === 'admin' && (
+                  {canViewProfit && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Profit
                     </th>
@@ -635,7 +636,7 @@ const Services = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       {getStatusBadge(service.status)}
                     </td>
-                    {user?.role === 'admin' && (
+                    {canViewProfit && (
                       <td className="px-6 py-4 whitespace-nowrap">
                         {service.profit ? (
                           <span className="text-sm font-medium text-green-600">
@@ -856,7 +857,7 @@ const Services = () => {
                       </select>
                     </div>
 
-                    {user?.role === 'admin' && (
+                    {canViewProfit && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Profit (MKD) (Optional)

@@ -12,7 +12,7 @@ async function setupDatabase() {
         email VARCHAR(255) UNIQUE,
         phone VARCHAR(50),
         password_hash VARCHAR(255),
-        role VARCHAR(50) NOT NULL DEFAULT 'admin' CHECK (role IN ('admin', 'manager')),
+        role VARCHAR(50) NOT NULL DEFAULT 'admin' CHECK (role IN ('admin', 'manager', 'services')),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -257,6 +257,28 @@ async function setupDatabase() {
       WHERE smartphone_models IS NULL
     `);
 
+    // Create models table for managing smartphone models
+    await run(`
+      CREATE TABLE IF NOT EXISTS models (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        price DECIMAL(10,2),
+        warranty INTEGER,
+        storages JSONB DEFAULT '[]'::jsonb,
+        colors JSONB DEFAULT '[]'::jsonb,
+        condition VARCHAR(100),
+        subcategory VARCHAR(100),
+        storage_prices JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create indexes for models table
+    await run(`CREATE INDEX IF NOT EXISTS idx_models_name ON models(name)`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_models_subcategory ON models(subcategory)`);
+    await run(`CREATE INDEX IF NOT EXISTS idx_models_condition ON models(condition)`);
+
 
     // Create services table
     await run(`
@@ -336,14 +358,14 @@ async function setupDatabase() {
     } else {
     }
 
-    // Update role constraint to allow manager role
+    // Update role constraint to allow manager and services roles
     await run(`
       ALTER TABLE users
       DROP CONSTRAINT IF EXISTS users_role_check
     `);
     await run(`
       ALTER TABLE users
-      ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'manager'))
+      ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'manager', 'services'))
     `);
 
     // Check if manager user already exists
@@ -355,6 +377,19 @@ async function setupDatabase() {
       await run(
         'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
         ['Store Manager', 'manager@storepos.com', managerPasswordHash, 'manager']
+      );
+    } else {
+    }
+
+    // Check if services user already exists
+    const servicesUserExists = await get('SELECT id FROM users WHERE email = $1', ['adem@storepos.com']);
+    
+    if (!servicesUserExists) {
+      // Create services user
+      const servicesPasswordHash = await bcrypt.hash('Adem1!', 10);
+      await run(
+        'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
+        ['Adem Services', 'adem@storepos.com', servicesPasswordHash, 'services']
       );
     } else {
     }

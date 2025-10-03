@@ -61,10 +61,26 @@ const requireAdminOrManager = (req, res, next) => {
   next();
 };
 
+const requireServices = (req, res, next) => {
+  if (req.user.role !== 'services') {
+    return res.status(403).json({ message: 'Services access required' });
+  }
+  next();
+};
+
+const requireAdminManagerOrServices = (req, res, next) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'manager' && req.user.role !== 'services') {
+    return res.status(403).json({ message: 'Admin, Manager or Services access required' });
+  }
+  next();
+};
+
 module.exports = {
   authenticateToken,
   requireAdmin,
   requireClient,
   requireManager,
-  requireAdminOrManager
+  requireAdminOrManager,
+  requireServices,
+  requireAdminManagerOrServices
 }; 

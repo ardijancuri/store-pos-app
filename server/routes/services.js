@@ -1,12 +1,12 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const router = express.Router();
-const { authenticateToken, requireAdmin, requireAdminOrManager } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireAdminOrManager, requireAdminManagerOrServices } = require('../middleware/auth');
 const db = require('../database/connection');
 const PDFDocument = require('pdfkit');
 
 // Get all services
-router.get('/', authenticateToken, requireAdminOrManager, async (req, res) => {
+router.get('/', authenticateToken, requireAdminManagerOrServices, async (req, res) => {
   try {
     const { search, status, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
@@ -90,7 +90,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // Create new service
-router.post('/', authenticateToken, requireAdminOrManager, [
+router.post('/', authenticateToken, requireAdminManagerOrServices, [
   body('full_name').trim().notEmpty().withMessage('Full name is required'),
   body('contact').trim().notEmpty().withMessage('Contact is required'),
   body('phone_model').trim().notEmpty().withMessage('Phone model is required'),
@@ -140,7 +140,7 @@ router.post('/', authenticateToken, requireAdminOrManager, [
 });
 
 // Update service
-router.put('/:id', authenticateToken, requireAdminOrManager, [
+router.put('/:id', authenticateToken, requireAdminManagerOrServices, [
   body('full_name').trim().notEmpty().withMessage('Full name is required'),
   body('contact').trim().notEmpty().withMessage('Contact is required'),
   body('phone_model').trim().notEmpty().withMessage('Phone model is required'),
@@ -197,7 +197,7 @@ router.put('/:id', authenticateToken, requireAdminOrManager, [
 });
 
 // Delete service
-router.delete('/:id', authenticateToken, requireAdminOrManager, async (req, res) => {
+router.delete('/:id', authenticateToken, requireAdminManagerOrServices, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await db.query(
@@ -217,10 +217,10 @@ router.delete('/:id', authenticateToken, requireAdminOrManager, async (req, res)
 });
 
 // Generate PDF invoice for service
-router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req, res) => {
+router.get('/:id/invoice', authenticateToken, requireAdminManagerOrServices, async (req, res) => {
   try {
     const serviceId = parseInt(req.params.id);
-    const isAdmin = req.user.role === 'admin';
+    const isAdminOrManagerOrServices = req.user.role === 'admin' || req.user.role === 'manager' || req.user.role === 'services';
 
     // Get service details
     let serviceQuery = `
@@ -230,8 +230,8 @@ router.get('/:id/invoice', authenticateToken, requireAdminOrManager, async (req,
     `;
     let serviceParams = [serviceId];
 
-    // Only restrict access for non-admin, non-manager users (if any exist in the future)
-    if (!isAdmin && req.user.role !== 'manager') {
+    // Only restrict access for users without proper roles (if any exist in the future)
+    if (!isAdminOrManagerOrServices) {
       serviceQuery += ' AND contact = $2';
       serviceParams.push(req.user.email || req.user.phone);
     }

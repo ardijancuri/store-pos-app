@@ -13,8 +13,8 @@ import AdminProductsPage from './pages/admin/Products';
 import AdminManagers from './pages/admin/Managers';
 import LoadingSpinner from './components/LoadingSpinner';
 
-const PrivateRoute = ({ children, requireAdmin = false, requireManager = false, requireAdminOrManager = false }) => {
-  const { isAuthenticated, isAdmin, isManager, loading } = useAuth();
+const PrivateRoute = ({ children, requireAdmin = false, requireManager = false, requireServices = false, requireAdminOrManager = false, requireAdminManagerOrServices = false }) => {
+  const { isAuthenticated, isAdmin, isManager, isServices, loading } = useAuth();
 
   if (loading) {
     return <LoadingSpinner />;
@@ -32,7 +32,15 @@ const PrivateRoute = ({ children, requireAdmin = false, requireManager = false, 
     return <Navigate to="/login" replace />;
   }
 
+  if (requireServices && !isServices) {
+    return <Navigate to="/login" replace />;
+  }
+
   if (requireAdminOrManager && !isAdmin && !isManager) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (requireAdminManagerOrServices && !isAdmin && !isManager && !isServices) {
     return <Navigate to="/login" replace />;
   }
 
@@ -40,7 +48,7 @@ const PrivateRoute = ({ children, requireAdmin = false, requireManager = false, 
 };
 
 const App = () => {
-  const { isAuthenticated, isAdmin, isManager, loading } = useAuth();
+  const { isAuthenticated, isAdmin, isManager, isServices, loading } = useAuth();
 
   if (loading) {
     return <LoadingSpinner />;
@@ -50,6 +58,7 @@ const App = () => {
   const getDefaultRoute = () => {
     if (isAdmin) return "/dashboard";
     if (isManager) return "/admin/orders";
+    if (isServices) return "/admin/services";
     return "/login";
   };
 
@@ -109,7 +118,7 @@ const App = () => {
         <Route
           path="/admin/services"
           element={
-            <PrivateRoute requireAdminOrManager>
+            <PrivateRoute requireAdminManagerOrServices>
               <Layout>
                 <AdminServices />
               </Layout>
