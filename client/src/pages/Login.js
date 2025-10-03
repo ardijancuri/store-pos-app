@@ -119,12 +119,6 @@ const Login = () => {
               )}
             </button>
           </div>
-
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Demo Admin: admin@storepos.com / Admin@2024Secure!
-            </p>
-          </div>
         </form>
       </div>
     </div>
